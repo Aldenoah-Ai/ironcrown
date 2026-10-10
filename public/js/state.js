@@ -27,7 +27,7 @@ const storage = {
 
 /* ---- Settings (per browser, not part of the save) ---- */
 const DEFAULT_SETTINGS = {
-  panMode: 'drag',        // 'drag' | 'keys' | 'both'
+  panMode: 'both',        // 'drag' | 'keys' | 'both'
   invertDrag: false,
   edgeScroll: false,
   zoomSpeed: 1,
@@ -36,14 +36,22 @@ const DEFAULT_SETTINGS = {
   particles: true,
   battleMode: 'watch',    // 'watch' = fought live on the map, 'auto' = resolved instantly
   focusBattles: true,     // camera jumps to battles as they start
-  graphics: 'high',       // 'high' (textured) | 'medium' (classic) | 'low' (low-poly)
+  graphics: 'low',        // 'high' (textured) | 'medium' (classic) | 'low' (low-poly)
   resolution: 'balanced', // 'sharp' | 'balanced' | 'performance' (canvas pixel density)
   minimap: true,
   autoQuality: true,      // back off automatically when frames get slow
   showFps: false,
 };
+// Bumped when a default changes for everyone. Older stored settings were saved
+// whole, defaults included, so a new default would otherwise never reach them.
+const SETTINGS_REV = 2;
 let SETTINGS = { ...DEFAULT_SETTINGS };
-try { Object.assign(SETTINGS, JSON.parse(storage.get(SETTINGS_KEY) || '{}')); } catch { /* defaults */ }
+try {
+  const stored = JSON.parse(storage.get(SETTINGS_KEY) || '{}') || {};
+  if ((stored.rev || 1) < 2) { delete stored.graphics; delete stored.panMode; }   // v3.5: low-poly + drag-and-keys by default
+  Object.assign(SETTINGS, stored);
+} catch { /* defaults */ }
+SETTINGS.rev = SETTINGS_REV;
 function saveSettings() { storage.set(SETTINGS_KEY, JSON.stringify(SETTINGS)); }
 
 /* ---- New game ---- */
@@ -116,7 +124,7 @@ const serialize = (st) => JSON.stringify(packState(st));
 
 function save() {
   if (!S) return false;
-  S.savedAt = Date.now();
+  S.savedAt = Date.now() - CATCHUP.left * 1000;   // time not yet simulated stays owed
   S.gameVersion = GAME_VERSION;
   const ok = storage.set(SAVE_KEY, serialize(S));
   API.push();
@@ -203,20 +211,40 @@ function carryOverV2(old) {
   log('Your kingdom has been moved to the new world map (v3). Buildings, troops, ships, generals and research came with you.', 'info');
 }
 
-// Offline progress: simulate time the tab was closed (capped, no raids).
+/* Offline progress: simulate time the tab was closed or hidden (capped, no raids).
+   Eight hours of a big realm is thousands of simulation steps — seconds of work.
+   Done in one go it froze the page before the first frame was ever drawn, which
+   looked like a black world under a working menu. Instead it is queued here and
+   worked off a slice per frame (runCatchUp) while the map is already on screen. */
+const CATCHUP = { left: 0, away: 0, before: null };
 function catchUp() {
-  const away = Math.min(OFFLINE_CAP, (Date.now() - S.savedAt) / 1000);
-  if (away < 5) return;
-  const before = { ...S.res };
-  let t = away;
-  const chunk = away > 3600 ? 10 : away > 600 ? 5 : 2;   // coarser steps for long absences keep loading fast
-  while (t > 0) { const d = Math.min(chunk, t); step(d, true); t -= d; }
-  const gains = RES.map((k) => [k, S.res[k] - before[k]]).filter(([, v]) => Math.abs(v) >= 1);
-  if (gains.length) {
-    log(`While you were away (${fmtTime(away)}) your kingdom produced ` + gains.map(([k, v]) => `${RES_META[k].icon}${fmt(v)}`).join(' '), 'good');
-    setTimeout(() => toast(`Welcome back! ${fmtTime(away)} of progress collected.`, 'good'), 500);
-  }
+  queueCatchUp((Date.now() - S.savedAt) / 1000);
 }
+function queueCatchUp(sec, min = 5) {
+  if (!S || !(sec >= min)) return;
+  if (!CATCHUP.left) { CATCHUP.away = 0; CATCHUP.before = { ...S.res }; }
+  const add = Math.min(sec, OFFLINE_CAP - CATCHUP.left);
+  if (add <= 0) return;
+  CATCHUP.left += add; CATCHUP.away += add;
+}
+// Works off queued offline time for at most budgetMs; true while any remains.
+function runCatchUp(budgetMs) {
+  if (!CATCHUP.left) return false;
+  const t0 = performance.now(), away = CATCHUP.away;
+  const chunk = away > 3600 ? 10 : away > 600 ? 5 : 2;   // coarser steps for long absences keep loading fast
+  do { const d = Math.min(chunk, CATCHUP.left); step(d, true); CATCHUP.left -= d; }
+  while (CATCHUP.left > 1e-6 && performance.now() - t0 < budgetMs);
+  if (CATCHUP.left > 1e-6) return true;
+  CATCHUP.left = 0;
+  const gains = RES.map((k) => [k, S.res[k] - CATCHUP.before[k]]).filter(([, v]) => Math.abs(v) >= 1);
+  if (gains.length && away >= 60) {
+    log(`While you were away (${fmtTime(away)}) your kingdom produced ` + gains.map(([k, v]) => `${RES_META[k].icon}${fmt(v)}`).join(' '), 'good');
+    toast(`Welcome back! ${fmtTime(away)} of progress collected.`, 'good');
+  }
+  UI.panelDirty = true;
+  return false;
+}
+function finishCatchUp() { while (runCatchUp(1e9)); }
 
 /* ---- Optional Python backend (server/server.py). Absent on GitHub Pages. ---- */
 const API = {
@@ -224,10 +252,15 @@ const API = {
   async init() {
     this.pid = storage.get(PID_KEY) || uid() + uid();
     storage.set(PID_KEY, this.pid);
-    if (location.protocol === 'file:') return;
+    // Static hosting has no backend: asking anyway costs a 404 and, on a slow
+    // connection, holds up the first frame of the map until it answers.
+    if (location.protocol === 'file:' || /\.github\.io$/.test(location.hostname)) return;
     try {
-      const r = await fetch('api/health', { cache: 'no-store' });
+      const ac = typeof AbortController === 'function' ? new AbortController() : null;
+      const timer = ac && setTimeout(() => ac.abort(), 2500);
+      const r = await fetch('api/health', { cache: 'no-store', signal: ac ? ac.signal : undefined });
       const j = r.ok ? await r.json() : null;
+      clearTimeout(timer);
       this.online = !!(j && j.ok);
     } catch { this.online = false; }
   },

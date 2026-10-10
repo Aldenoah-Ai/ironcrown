@@ -368,3 +368,46 @@ code { background: var(--bg2); padding: 1px 5px; border-radius: 4px; }
 .card.obj { border-color: #4ea1f2; }
 .obj-row { margin-top: 3px; }
 .paused-banner { position: absolute; top: 56px; left: 50%; transform: translateX(-50%); z-index: 3; background: rgba(18,21,28,.9); border: 1px solid var(--gold); border-radius: 8px; padding: 4px 14px; font-weight: 700; color: var(--gold); pointer-events: none; }
+
+/* ==================== v3.5: loading, catch-up, smoother UI ==================== */
+/* Loading screen over the map until its first frame is drawn. */
+#boot-screen { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; background: radial-gradient(ellipse at 50% 40%, #1d2a3d 0%, #0d1016 70%); transition: opacity .4s ease; }
+#boot-screen.done { opacity: 0; pointer-events: none; }
+#boot-screen .boot-card { text-align: center; color: var(--text); padding: 24px; max-width: 460px; }
+#boot-screen .boot-crown { font-size: 54px; animation: boot-bob 1.6s ease-in-out infinite; }
+#boot-screen h1 { font-family: var(--display); color: var(--gold); margin: 6px 0 4px; font-size: 30px; letter-spacing: .5px; }
+#boot-screen .boot-msg { color: var(--muted); font-size: 14px; }
+#boot-screen .boot-bar { width: 220px; height: 4px; margin: 16px auto 0; border-radius: 2px; background: var(--line); overflow: hidden; position: relative; }
+#boot-screen .boot-bar::after { content: ""; position: absolute; inset: 0; width: 40%; border-radius: 2px; background: linear-gradient(90deg, var(--gold-dark), var(--gold)); animation: boot-slide 1.1s ease-in-out infinite; }
+#boot-screen.failed .boot-bar, #boot-screen.failed .boot-crown { display: none; }
+#boot-screen.failed .boot-msg { color: var(--text); }
+#boot-screen .boot-actions { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 14px; }
+@keyframes boot-bob { 50% { transform: translateY(-6px); } }
+@keyframes boot-slide { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
+
+/* Offline progress banner, with its own progress bar */
+.paused-banner.catchup { overflow: hidden; padding-bottom: 6px; }
+.paused-banner.catchup i { position: absolute; left: 0; bottom: 0; height: 3px; background: var(--gold); transition: width .2s linear; }
+
+/* If the map ever fails to draw, show sea rather than a black void. */
+#stage { background: #1c4a70; }
+
+/* Gentle feedback everywhere you can click */
+.btn, .icon-btn, .tabs button, .speed-ctl button, .zoom-ctl button, .chip, .card { transition: background-color .15s, border-color .15s, color .15s, filter .15s, transform .08s, box-shadow .15s; }
+.tabs button:hover:not(.active) { color: var(--text); background: rgba(255,255,255,.03); }
+.btn:focus-visible, .icon-btn:focus-visible, .tabs button:focus-visible, select:focus-visible, input:focus-visible, .speed-ctl button:focus-visible, .zoom-ctl button:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+#panel-body { scroll-behavior: smooth; overscroll-behavior: contain; }
+#panel-body.fresh > * { animation: panel-in .18s ease-out; }
+@keyframes panel-in { from { opacity: 0; transform: translateY(4px); } }
+/* Long modals keep their buttons in reach */
+.modal-card .actions:last-child { position: sticky; bottom: -20px; margin: 14px -20px -20px; padding: 12px 20px; background: linear-gradient(180deg, rgba(30,36,48,0), var(--panel) 35%); }
+.modal-card { overscroll-behavior: contain; }
+#modal[hidden], #boot-screen[hidden] { display: none; }
+@media (max-width: 900px) {
+  #minimap { width: 112px !important; opacity: .92; }
+  #toasts { top: auto; bottom: 12px; left: 12px; right: 12px; align-items: center; }
+  .toast { max-width: 100%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+}

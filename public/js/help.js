@@ -10,7 +10,7 @@ const HELP = [
       <li><b>Build economy first.</b> Open the <b>🏗️ Build</b> tab, pick a Gold Mine, Lumber Mill or Farm, and click a free hex inside your golden border.</li>
       <li><b>Upgrade the Main Hall</b> (click the castle). It has <b>no maximum level</b>. Each level claims another ring of land around your capital, adds storage, builders and divisions, and raises every building's level cap and count limits. Ports, Shipyards, Universities and Stables unlock at level 2.</li>
       <li><b>Train troops</b> in the <b>⚔️ Army</b> tab and group them into <b>divisions</b>.</li>
-      <li>Switch to the <b>🗺️ World</b> view (top-left, or press <kbd>M</kbd>) to explore, claim land, fight and trade.</li>
+      <li>Zoom out (scroll, or press <kbd>M</kbd>) to see the whole world, then explore, claim land, fight and trade. <kbd>K</kbd> flies you home.</li>
       <li>Build a <b>University</b> and start <b>🎓 Research</b> early, because it multiplies everything.</li>
     </ol>
     <p><b>🎯 Objectives</b> at the top of the Build tab guide you through every system (farms, the Main Hall, troops, scouting, land, defenses, research, divisions, battles, fleets, alliances) and pay rewards when completed.</p>
@@ -18,23 +18,24 @@ const HELP = [
   { id: 'camera', icon: '🎥', title: 'One map, camera & controls', html: `
     <p><b>There is only one map, made of small hexes.</b> Land, sea, your city, enemy cities, armies and battles all share the same hex grid. <b>Zoom in</b> (scroll or pinch) to build and manage your city. <b>Zoom out</b> to see the continent: every kingdom's cities and territory, and every army, guard, fleet and battle. Enemy capitals are real cities too: zoom in on one to see its keep, buildings, walls and towers.</p>
     <table class="keys">
-      <tr><td>Drag with mouse or finger</td><td>Move the map (default)</td></tr>
+      <tr><td>Drag with mouse or finger</td><td>Move the map</td></tr>
       <tr><td>Scroll wheel / pinch</td><td>Zoom in & out</td></tr>
-      <tr><td><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> / arrows</td><td>Move the map (enable in Settings → Camera)</td></tr>
+      <tr><td><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> / arrows</td><td>Move the map (or drag it; Settings → Camera)</td></tr>
       <tr><td><kbd>+</kbd> <kbd>−</kbd> / zoom buttons</td><td>Zoom</td></tr>
-      <tr><td><kbd>Space</kbd> / ⌖ button</td><td>Recenter on your capital</td></tr>
-      <tr><td><kbd>K</kbd> / <kbd>M</kbd> / 🏠</td><td>Fly to your capital / zoom out to the whole world</td></tr>
+      <tr><td><kbd>Space</kbd> / 🏠 button</td><td>Recenter on your capital</td></tr>
+      <tr><td><kbd>K</kbd> / <kbd>M</kbd></td><td>Fly to your capital / zoom out to the whole world</td></tr>
       <tr><td>Left-click</td><td>Select a building, hex, division or fleet</td></tr>
-      <tr><td>Right-click (World)</td><td>Give the selected division/fleet the default order for that hex</td></tr>
+      <tr><td>Right-click</td><td>Give the selected division/fleet the default order for that hex</td></tr>
+      <tr><td><kbd>1</kbd> … <kbd>9</kbd></td><td>Switch panel tab (Build, Map, Research, Army, Navy, Generals, Shop, Alliance, Log)</td></tr>
       <tr><td><kbd>Esc</kbd></td><td>Cancel placement / deselect / close dialogs</td></tr>
       <tr><td><kbd>H</kbd> or <kbd>?</kbd></td><td>This help guide</td></tr>
       <tr><td><kbd>P</kbd> / ⏸ 1× 2× 4×</td><td>Pause or change game speed (top-left of the map)</td></tr>
     </table>
     <h4>Performance</h4>
-    <p>If the game lags, open ⚙️ Settings and set <b>Render resolution → ⚡ Performance</b>. It has the biggest effect, especially on high-DPI and 4K screens. <b>Graphics quality → 🔷 Low-poly</b> helps too.</p>
+    <p>The game starts on <b>🔷 Low-poly</b> graphics, the fastest. If it still lags, open ⚙️ Settings and press <b>⚡ Make it fast</b>, or set <b>Render resolution → ⚡ Performance</b>, which has the biggest effect on high-DPI and 4K screens.</p>
     <h4>Graphics quality</h4>
     <p>⚙️ Settings → <b>Graphics quality</b> switches instantly between <b>✨ High</b>, <b>🎨 Classic</b> and <b>🔷 Low-poly</b>. High has realistic procedural textures (grass blades, meadow flowers, forest litter, rock, sand ripples, snow), hill-shading, animated water with sun glints, and drifting cloud shadows. Classic uses flat colours. Low-poly draws every hex as flat-shaded facets and is the fastest option on weak devices.</p>
-    <p>Open <b>⚙️ Settings</b> in the top bar to choose how the camera moves: <b>Drag</b>, <b>Keyboard</b> or <b>Both</b>. You can also invert dragging, turn on edge scrolling, change the zoom speed and toggle the minimap. On the World map, click or drag the <b>minimap</b> in the corner to jump anywhere.</p>` },
+    <p>Open <b>⚙️ Settings</b> in the top bar to choose how the camera moves: <b>Drag</b>, <b>Keyboard</b> or <b>Both</b>. You can also invert dragging, turn on edge scrolling, change the zoom speed and toggle the minimap. Click or drag the <b>minimap</b> in the corner to jump anywhere.</p>` },
   { id: 'kingdom', icon: '🏰', title: 'Kingdom & buildings', html: `
     <p>Your kingdom is the land you own on the map (gold border), centred on the <b>Main Hall</b> and its cobbled plaza. Coastal buildings (Port, Shipyard) must touch the sea.</p>
     <ul>

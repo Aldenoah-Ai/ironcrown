@@ -150,11 +150,50 @@ function renderPanel(force) {
   if (!fn) { UI.tab = 'info'; return renderPanel(force); }      // an unknown tab must never wedge the panel
   const html = fn();
   if (html !== UI.lastPanelHtml) {
-    const body = el('panel-body'), scroll = body.scrollTop;
-    body.innerHTML = html; body.scrollTop = scroll;
+    const body = el('panel-body');
+    // A new tab is drawn fresh; the same tab is patched in place, so the
+    // once-a-second refresh never flickers, steals a hover or eats a click.
+    if (UI.lastPanelTab !== UI.tab || !UI.lastPanelHtml) {
+      const newTab = UI.lastPanelTab !== UI.tab;
+      body.innerHTML = html; UI.lastPanelTab = UI.tab;
+      if (newTab) { body.classList.add('fresh'); clearTimeout(renderPanel.fade); renderPanel.fade = setTimeout(() => body.classList.remove('fresh'), 250); }
+    }
+    else { const scroll = body.scrollTop; morphHtml(body, html); body.scrollTop = scroll; }
     UI.lastPanelHtml = html;
   }
   UI.panelDirty = false;
+}
+/* ---- in-place DOM patching ----
+   Walks the new markup alongside the live nodes and touches only what changed:
+   text that ticked, an attribute that flipped, a row that appeared. Nodes are
+   matched by position, which suits panels whose layout is stable between ticks. */
+const morphTpl = document.createElement('template');
+function morphHtml(target, html) {
+  morphTpl.innerHTML = html;
+  morphChildren(target, morphTpl.content);
+  morphTpl.innerHTML = '';
+}
+function morphChildren(a, b) {
+  const bn = b.childNodes;
+  for (let i = 0; i < bn.length; i++) {
+    const nb = bn[i], na = a.childNodes[i];
+    if (!na) { a.appendChild(nb.cloneNode(true)); continue; }
+    if (na.nodeType !== nb.nodeType || na.nodeName !== nb.nodeName) { a.replaceChild(nb.cloneNode(true), na); continue; }
+    if (nb.nodeType !== 1) { if (na.nodeValue !== nb.nodeValue) na.nodeValue = nb.nodeValue; continue; }
+    morphAttrs(na, nb);
+    morphChildren(na, nb);
+    if (na.tagName === 'SELECT') { const opt = nb.querySelector('option[selected]'); na.value = opt ? opt.value : (na.options[0] || {}).value; }
+  }
+  while (a.childNodes.length > bn.length) a.removeChild(a.lastChild);
+}
+function morphAttrs(na, nb) {
+  for (const { name, value } of nb.attributes) if (na.getAttribute(name) !== value) na.setAttribute(name, value);
+  for (let k = na.attributes.length - 1; k >= 0; k--) { const n = na.attributes[k].name; if (!nb.hasAttribute(n)) na.removeAttribute(n); }
+  if (na.tagName === 'INPUT') {
+    if (na.type === 'checkbox' || na.type === 'radio') na.checked = nb.hasAttribute('checked');
+    else if (document.activeElement !== na) { const v = nb.getAttribute('value') || ''; if (na.value !== v) na.value = v; }
+  }
+  if (na.tagName === 'TEXTAREA' && document.activeElement !== na && na.value !== nb.value) na.value = nb.value;
 }
 function renderInfo() {
   const b = S.buildings.find((x) => x.id === UI.selected);
@@ -234,7 +273,7 @@ function renderBuildingInfo(b) {
     for (const r of ['lumber', 'iron', 'food']) h += btn(`Sell 200 ${RES_META[r].icon}`, 'trade', 'sell:' + r, { cls: 'sm ghost' }) + btn(`Buy 100 ${RES_META[r].icon}`, 'trade', 'buy:' + r, { cls: 'sm ghost' });
     h += '</div>';
   }
-  if (b.type === 'scoutlodge') h += `<p class="small muted">Send scouts from the 🗺️ World map: click any hex, then "Send scouts".</p>`;
+  if (b.type === 'scoutlodge') h += `<p class="small muted">Send scouts from the map: click any hex, then "Send scouts".</p>`;
   if (b.type !== 'hall') h += `<div style="margin-top:16px">${btn('Demolish', 'demolish', b.id, { cls: 'sm red' })}</div>`;
   return h;
 }
@@ -307,7 +346,7 @@ function renderArmy() {
     <dt>Defense rating</dt><dd>🛡️ ${fmt(defenseRating())}</dd><dt>Food upkeep</dt><dd>🌾 ${(upkeep().food * 60).toFixed(1)}/min</dd><dt>Castellan</dt><dd>${generalChip(S.castellan)}</dd></dl>
     <h3>Garrison (at the capital)</h3><div class="pills">${unitList(S.army, UNITS)}</div>
     <h3>Divisions · ${S.divisions.length}/${divisionLimit()}</h3>
-    <p class="small muted">Group troops into divisions, give each a general, then command them on the 🗺️ World map: move, attack, explore ruins, capture forts, claim land and intercept raiders.</p>`;
+    <p class="small muted">Group troops into divisions, give each a general, then command them on the map: move, attack, explore ruins, capture forts, claim land and intercept raiders.</p>`;
   h += S.divisions.map(divisionCard).join('') || '<p class="small muted">No divisions in the field.</p>';
   h += `<div class="row">${btn('⚔️ Muster a new division', 'muster', '', { disabled: S.divisions.length >= divisionLimit() })}</div>`;
   if (S.boosts.warhorn || S.boosts.salve) h += `<p class="small">Next battle: ${S.boosts.warhorn ? '📯 War Horn ' : ''}${S.boosts.salve ? '🧪 Healing Salve' : ''}</p>`;

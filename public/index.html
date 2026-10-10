@@ -6,9 +6,11 @@
   <title>Ironcrown — Kingdom Strategy</title>
   <meta name="description" content="Build a kingdom on a hex world, research technologies, command divisions and fleets in on-map battles, explore ruins and conquer rival realms. Runs in your browser." />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>👑</text></svg>" />
-  <link rel="stylesheet" href="style.css?v=3.4.3" />
+  <link rel="stylesheet" href="style.css?v=3.5.0" />
 </head>
 <body>
+  <div id="boot-screen" role="status" aria-live="polite"><div class="boot-card"><div class="boot-crown">👑</div><h1>Ironcrown</h1><div class="boot-msg">Raising the realm…</div><div class="boot-bar"></div></div></div>
+  <noscript><p style="color:#e8e2d0;text-align:center;padding:40px">Ironcrown needs JavaScript to run.</p></noscript>
   <div id="app">
     <!-- ===== Top HUD ===== -->
     <header id="hud">
@@ -56,15 +58,15 @@
       <!-- ===== Side panel ===== -->
       <aside id="panel">
         <nav class="tabs" role="tablist">
-          <button data-tab="info" class="active"><em>🏗️</em><span>Build</span></button>
-          <button data-tab="map"><em>🧭</em><span>Map</span></button>
-          <button data-tab="research"><em>🎓</em><span>Research</span></button>
-          <button data-tab="army"><em>⚔️</em><span>Army</span></button>
-          <button data-tab="navy"><em>⚓</em><span>Navy</span></button>
-          <button data-tab="generals"><em>🎖️</em><span>Generals</span></button>
-          <button data-tab="shop"><em>🎁</em><span>Shop</span></button>
-          <button data-tab="alliance"><em>🤝</em><span>Alliance</span></button>
-          <button data-tab="log"><em>📜</em><span>Log</span><i id="log-dot" hidden></i></button>
+          <button data-tab="info" class="active" title="Build (1)"><em>🏗️</em><span>Build</span></button>
+          <button data-tab="map" title="Map (2)"><em>🧭</em><span>Map</span></button>
+          <button data-tab="research" title="Research (3)"><em>🎓</em><span>Research</span></button>
+          <button data-tab="army" title="Army (4)"><em>⚔️</em><span>Army</span></button>
+          <button data-tab="navy" title="Navy (5)"><em>⚓</em><span>Navy</span></button>
+          <button data-tab="generals" title="Generals (6)"><em>🎖️</em><span>Generals</span></button>
+          <button data-tab="shop" title="Shop (7)"><em>🎁</em><span>Shop</span></button>
+          <button data-tab="alliance" title="Alliance (8)"><em>🤝</em><span>Alliance</span></button>
+          <button data-tab="log" title="Log (9)"><em>📜</em><span>Log</span><i id="log-dot" hidden></i></button>
         </nav>
         <div id="panel-body"></div>
       </aside>
@@ -76,23 +78,23 @@
   <div id="toasts"></div>
 
   <!-- Game scripts (classic scripts sharing one global scope; order matters) -->
-  <script src="js/data.js?v=3.4.3"></script>
-  <script src="js/util.js?v=3.4.3"></script>
-  <script src="js/state.js?v=3.4.3"></script>
-  <script src="js/economy.js?v=3.4.3"></script>
-  <script src="js/military.js?v=3.4.3"></script>
-  <script src="js/research.js?v=3.4.3"></script>
-  <script src="js/world.js?v=3.4.3"></script>
-  <script src="js/sim.js?v=3.4.3"></script>
-  <script src="js/alliances.js?v=3.4.3"></script>
-  <script src="js/battle.js?v=3.4.3"></script>
-  <script src="js/render-common.js?v=3.4.3"></script>
-  <script src="js/gfx.js?v=3.4.3"></script>
-  <script src="js/render-city.js?v=3.4.3"></script>
-  <script src="js/render-world.js?v=3.4.3"></script>
-  <script src="js/help.js?v=3.4.3"></script>
-  <script src="js/ui-panels.js?v=3.4.3"></script>
-  <script src="js/ui-actions.js?v=3.4.3"></script>
-  <script src="js/main.js?v=3.4.3"></script>
+  <script src="js/data.js?v=3.5.0"></script>
+  <script src="js/util.js?v=3.5.0"></script>
+  <script src="js/state.js?v=3.5.0"></script>
+  <script src="js/economy.js?v=3.5.0"></script>
+  <script src="js/military.js?v=3.5.0"></script>
+  <script src="js/research.js?v=3.5.0"></script>
+  <script src="js/world.js?v=3.5.0"></script>
+  <script src="js/sim.js?v=3.5.0"></script>
+  <script src="js/alliances.js?v=3.5.0"></script>
+  <script src="js/battle.js?v=3.5.0"></script>
+  <script src="js/render-common.js?v=3.5.0"></script>
+  <script src="js/gfx.js?v=3.5.0"></script>
+  <script src="js/render-city.js?v=3.5.0"></script>
+  <script src="js/render-world.js?v=3.5.0"></script>
+  <script src="js/help.js?v=3.5.0"></script>
+  <script src="js/ui-panels.js?v=3.5.0"></script>
+  <script src="js/ui-actions.js?v=3.5.0"></script>
+  <script src="js/main.js?v=3.5.0"></script>
 </body>
 </html>

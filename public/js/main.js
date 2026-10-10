@@ -7,30 +7,76 @@ let lastFrame = performance.now(), hudTimer = 0, panelTimer = 0, saveTimer = 15;
 UI.gameSpeed = 1;
 
 function frame(now) {
-  try { frameInner(now); } catch (e) { console.error(e); }
+  try { frameInner(now); } catch (e) { reportError('frame', e); }
   requestAnimationFrame(frame);
+}
+// An error that repeats every frame would flood the console sixty times a second.
+const seenErrors = new Set();
+function reportError(where, e) {
+  const key = where + ':' + (e && e.message);
+  if (seenErrors.has(key) || seenErrors.size > 50) return;
+  seenErrors.add(key);
+  console.error(`[${where}]`, e);
 }
 function frameInner(now) {
   let dt = (now - lastFrame) / 1000;
   lastFrame = now;
-  if (dt > 1.5 && UI.gameSpeed > 0) { let t = Math.min(dt, OFFLINE_CAP); while (t > 0) { const d = Math.min(2, t); step(d, true); t -= d; } dt = 0; }  // tab was hidden
+  if (dt > 1.5 && UI.gameSpeed > 0) { queueCatchUp(dt, 0); dt = 0; }   // tab was hidden: worked off below, a slice per frame
   dt = Math.min(dt, 0.25);
   GOV.sample(dt);
+  if (runCatchUp(GOV.ms > 30 ? 14 : 22)) dt = 0;    // the world waits while it catches up
   let sim = dt * UI.gameSpeed;
   while (sim > 0) { const d = Math.min(1, sim); step(d); sim -= d; }
   Battles.frame(dt);
   inputFrame(dt);
+  CAM.tick(dt);
   const t = now / 1000;
-  drawWorld(ctx, t, dt);
+  // A drawing error must never take the HUD, the panel or the autosave down with it.
+  try { drawWorld(ctx, t, dt); } catch (e) { canvasPoisoned = true; reportError('draw', e); }
+  if (!booted) finishBoot();
 
   hudTimer -= dt; panelTimer -= dt; saveTimer -= dt;
-  if (hudTimer <= 0) { updateHud(); renderBattleHud(); hudTimer = 0.15; }
+  if (hudTimer <= 0) { updateHud(); renderBattleHud(); renderCatchUp(); hudTimer = 0.15; }
   if (panelTimer <= 0 || (UI.panelDirty && panelTimer < 0.75)) { renderPanel(); panelTimer = 1; }
   if (saveTimer <= 0) { save(); saveTimer = 15; }
 }
 
+// "Catching up…" banner over the map while offline time is worked off.
+function renderCatchUp() {
+  let b = el('catchup-banner');
+  if (!CATCHUP.left) { if (b) b.hidden = true; return; }
+  if (!b) { b = document.createElement('div'); b.id = 'catchup-banner'; b.className = 'paused-banner catchup'; el('stage-wrap').appendChild(b); }
+  const pct = Math.round(100 * (1 - CATCHUP.left / Math.max(1, CATCHUP.away)));
+  b.hidden = false;
+  b.innerHTML = `⏳ Catching up on ${fmtTime(CATCHUP.away)} away… <b>${pct}%</b><i style="width:${pct}%"></i>`;
+}
+
+// The first drawn frame lifts the loading screen.
+let booted = false;
+function finishBoot() {
+  booted = true;
+  const bs = el('boot-screen');
+  if (bs) { bs.classList.add('done'); setTimeout(() => bs.remove(), 450); }
+}
+function bootFailed(e) {
+  console.error('boot failed:', e);
+  const bs = el('boot-screen');
+  if (!bs) return;
+  bs.classList.add('failed');
+  bs.querySelector('.boot-msg').innerHTML = `Your realm could not be loaded.<br><small>${esc(String(e && e.message || e))}</small>
+    <div class="boot-actions"><button class="btn" onclick="location.reload()">↻ Try again</button>
+    <button class="btn ghost" onclick="bootFresh()">Keep a backup and start a new realm</button></div>`;
+}
+function bootFresh() {
+  const raw = storage.get(SAVE_KEY);
+  if (raw) storage.set(SAVE_KEY + '-backup-' + Date.now(), raw);
+  storage.del(SAVE_KEY);
+  location.reload();
+}
+
 async function boot() {
   cv = el('stage'); ctx = cv.getContext('2d');
+  watchCanvas();
   buildHud();
   const fresh = params.get('reset') === '1';
   if (fresh) {
@@ -43,7 +89,7 @@ async function boot() {
   if (API.online) {
     el('sync').classList.add('online'); el('sync-label').textContent = 'synced';
     const remote = fresh ? null : await API.pull();
-    if (remote && remote.version === SAVE_VERSION && (!loaded || remote.savedAt > S.savedAt)) { S = remote; deriveKingdom(); deriveWorld(); loaded = true; }
+    if (remote && remote.version === SAVE_VERSION && (!loaded || remote.savedAt > S.savedAt)) { S = unpackState(remote); deriveKingdom(); deriveWorld(); loaded = true; }
   }
   if (loaded) catchUp(); else newGame();
   bindInput();
@@ -51,6 +97,7 @@ async function boot() {
   resetView();
   updateHud();
   if (!S.started) showWelcome();
+  lastFrame = performance.now();
   requestAnimationFrame(frame);
   document.body.dataset.ready = '1';
   console.log(`%c👑 Ironcrown v${GAME_VERSION}%c  Developer cheats available — type %ccheats.help()`, 'color:#f2c14e;font-weight:bold;font-size:14px', 'color:#9aa3b5', 'color:#57c26b;font-weight:bold');
@@ -131,4 +178,5 @@ function done(msg) { UI.panelDirty = true; if (S) { renderPanel(true); updateHud
 window.cheats = cheats;
 window.ironcrown.cheats = cheats;
 
-if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
+function start() { boot().catch(bootFailed); }
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();

@@ -108,6 +108,7 @@ await test('one map of small hexes: buildings sit on map hexes around the capita
   assert((await G(() => window.ironcrown.CAM.z)) < 1, 'zoomed out over the world');
   await shot('02b-world-same-map');
   await page.keyboard.press('k');
+  await page.waitForTimeout(700);                     // the camera glides there
   assert((await G(() => window.ironcrown.CAM.z)) > 4, 'K flies back to the capital');
 });
 
@@ -131,16 +132,16 @@ await test('settings: keyboard camera mode disables drag and enables WASD', asyn
   await page.click('.hud-stats [data-action="settings"]');
   await page.selectOption('[data-setting="panMode"]', 'keys');
   await page.keyboard.press('Escape');
-  const x0 = await G(() => window.ironcrown.CAM.x);
+  const x0 = await G(() => { window.ironcrown.CAM.settle(); return window.ironcrown.CAM.x; });   // let any glide finish
   await page.mouse.move(500, 500); await page.mouse.down(); await page.mouse.move(300, 500, { steps: 6 }); await page.mouse.up();
   assert(Math.abs((await G(() => window.ironcrown.CAM.x)) - x0) < 1, 'drag no longer pans in keyboard mode');
   await page.keyboard.down('d'); await page.waitForTimeout(350); await page.keyboard.up('d');
   assert(Math.abs((await G(() => window.ironcrown.CAM.x)) - x0) > 20, 'D key pans');
   await page.click('.hud-stats [data-action="settings"]');
-  await page.selectOption('[data-setting="panMode"]', 'drag');
+  await page.selectOption('[data-setting="panMode"]', 'both');
   await shot('03-settings');
   await page.keyboard.press('Escape');
-  assert((await G(() => window.ironcrown.SETTINGS.panMode)) === 'drag', 'restored');
+  assert((await G(() => window.ironcrown.SETTINGS.panMode)) === 'both', 'restored');
 });
 
 await test('help menu explains every feature', async () => {
@@ -1217,6 +1218,145 @@ await test('mobile viewport renders without horizontal overflow', async () => {
   assert(overflow <= 1, `no sideways scroll (overflow ${overflow}px)`);
   await shot('13-mobile');
   await page.setViewportSize({ width: 1440, height: 900 });
+});
+
+await test('number keys switch panel tabs; the home button glides back to the capital', async () => {
+  await closeModalIfOpen();
+  await page.mouse.move(600, 400);
+  await page.keyboard.press('3');
+  assert(await page.isVisible('[data-tab="research"].active'), '3 opens Research');
+  await page.keyboard.press('1');
+  assert(await page.isVisible('[data-tab="info"].active'), '1 opens Build');
+  await G(() => { const C = window.ironcrown.CAM; C.stop(); C.x += 400; C.y += 300; C.clamp(); });
+  await page.click('[data-action="zoom-home"]');
+  const mid = await G(() => ({ moving: !!window.ironcrown.CAM.fly }));
+  assert(mid.moving, 'the camera is flying, not cutting');
+  await page.waitForTimeout(900);
+  const r = await G(() => { const s = window.ironcrown.state, W = window.ironcrown.debug.WG, C = window.ironcrown.CAM; return { d: Math.hypot(C.x - W.cx[s.world.capital], C.y - W.cy[s.world.capital]), fly: !!C.fly }; });
+  assert(r.d < 2 && !r.fly, `arrived over the capital (${r.d.toFixed(1)} away)`);
+});
+
+await test('the side panel is patched in place, not rebuilt every second', async () => {
+  await page.click('[data-tab="info"]');
+  await G(() => { window.__probe = document.querySelector('#panel-body .card'); });
+  await ff(30);
+  await G(() => { window.ironcrown.UI.panelDirty = true; });
+  await page.waitForTimeout(1300);
+  assert(await G(() => !!(window.__probe && window.__probe.isConnected)), 'the same card element survived a refresh');
+});
+
+/* ---- start-up robustness: each in its own browser context so the shared session is untouched ---- */
+async function freshPage(init) {
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+  if (init) await ctx.addInitScript(init);
+  const p = await ctx.newPage();
+  const errs = [];
+  p.on('pageerror', (e) => errs.push(e.message));
+  return { ctx, p, errs };
+}
+const richness = (p, sel) => p.evaluate((sel) => {
+  const c = document.querySelector(sel), d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data, colors = new Set();
+  for (let i = 0; i < d.length; i += 4 * 97) colors.add(((d[i] >> 3) << 10) | ((d[i + 1] >> 3) << 5) | (d[i + 2] >> 3));
+  return colors.size;
+}, sel);
+
+await test('graphics default to low-poly, and older stored settings move to it once', async () => {
+  const a = await freshPage();
+  await a.p.goto(url('&reset=1')); await a.p.waitForSelector('body[data-ready="1"]');
+  assert((await a.p.evaluate(() => window.ironcrown.SETTINGS.graphics)) === 'low', 'a new player starts on low-poly');
+  assert((await a.p.evaluate(() => window.ironcrown.SETTINGS.panMode)) === 'both', 'drag and WASD both work by default');
+  await a.ctx.close();
+  const b = await freshPage(() => localStorage.setItem('ironcrown-settings', JSON.stringify({ graphics: 'high', panMode: 'drag', showGrid: false })));
+  await b.p.goto(url('&reset=1')); await b.p.waitForSelector('body[data-ready="1"]');
+  const sb = await b.p.evaluate(() => ({ ...window.ironcrown.SETTINGS }));
+  assert(sb.graphics === 'low' && sb.showGrid === false, `pre-3.5 settings get the new default but keep the rest (${sb.graphics}, grid ${sb.showGrid})`);
+  await b.ctx.close();
+  const c = await freshPage(() => localStorage.setItem('ironcrown-settings', JSON.stringify({ graphics: 'high', rev: 2 })));
+  await c.p.goto(url('&reset=1')); await c.p.waitForSelector('body[data-ready="1"]');
+  assert((await c.p.evaluate(() => window.ironcrown.SETTINGS.graphics)) === 'high', 'a choice made since is respected');
+  await c.ctx.close();
+});
+
+await test('eight hours away: the map shows at once and the absence is caught up in the background', async () => {
+  const { ctx, p, errs } = await freshPage();
+  await p.route('**/api/**', (r) => r.abort());     // browser storage only: a server copy would be newer
+  await p.goto(url('&reset=1')); await p.waitForSelector('body[data-ready="1"]');
+  await p.evaluate(() => { document.getElementById('begin-btn').click(); window.cheats.army(40); window.cheats.time(600); window.ironcrown.api.save(); });
+  // pretend the save is eight hours old, and keep the page from re-saving over it on the way out
+  await p.evaluate(() => {
+    const k = 'ironcrown-save-e2e', raw = JSON.parse(localStorage.getItem(k));
+    raw.savedAt -= 8 * 3600e3;
+    window.removeEventListener('beforeunload', window.save); window.save = () => {};
+    window.__gold = raw.res.gold; localStorage.setItem(k, JSON.stringify(raw));
+  });
+  const goldBefore = await p.evaluate(() => window.__gold);
+  const t0 = Date.now();
+  await p.reload(); await p.waitForSelector('body[data-ready="1"]');
+  await p.waitForFunction(() => !document.getElementById('boot-screen'), null, { timeout: 5000 });
+  const shown = Date.now() - t0;
+  const rich = await richness(p, '#stage');
+  assert(rich > 40, `the map is drawn straight away (${rich} colours)`);
+  assert(shown < 4000, `loading screen gone in ${shown}ms`);
+  await p.waitForFunction(() => !window.ironcrown.state || (typeof CATCHUP !== 'undefined' && CATCHUP.left === 0), null, { timeout: 60000 });
+  const after = await p.evaluate(() => ({ gold: window.ironcrown.state.res.gold, log: window.ironcrown.state.log.slice(0, 5).map((l) => l.text).join(' | '), t: window.ironcrown.state.time }));
+  assert(after.gold > goldBefore, `the absence produced gold (${goldBefore} → ${after.gold})`);
+  assert(/While you were away \(8h/.test(after.log), 'the log reports the absence: ' + after.log.slice(0, 120));
+  assert(errs.length === 0, errs.join('\n'));
+  await ctx.close();
+});
+
+await test('a drawing error that leaves the canvas wrecked does not black out the map', async () => {
+  const { ctx, p, errs } = await freshPage();
+  await p.goto(url('&reset=1')); await p.waitForSelector('body[data-ready="1"]');
+  await p.evaluate(() => { document.getElementById('begin-btn').click(); window.ironcrown.SETTINGS.autoQuality = false; });
+  await p.waitForTimeout(500);
+  const ok = await richness(p, '#stage');
+  // the worst kind of failure: mid-save(), clipped to one pixel, fully transparent — then throw
+  await p.evaluate(() => {
+    const B = window.ironcrown.Battles; window.__draw = B.draw;
+    B.draw = function (g) { g.save(); g.globalAlpha = 0; g.beginPath(); g.rect(0, 0, 1, 1); g.clip(); throw new Error('boom (test)'); };
+  });
+  await p.waitForTimeout(600);
+  const during = await richness(p, '#stage');
+  await p.evaluate(() => { window.ironcrown.Battles.draw = window.__draw; });
+  await p.waitForTimeout(400);
+  const after = await richness(p, '#stage');
+  assert(during > ok * 0.5 && after > ok * 0.5, `map stays drawn (${ok} → ${during} → ${after} colours)`);
+  assert(await p.evaluate(() => !!document.querySelector('#panel-body .card')), 'the panel still renders');
+  // a GPU reset throws every cached image away; the map rebuilds them
+  await p.evaluate(() => document.getElementById('stage').dispatchEvent(new Event('contextrestored')));
+  await p.waitForTimeout(800);
+  assert((await richness(p, '#stage')) > ok * 0.5, 'map redrawn after a context restore');
+  assert(errs.length === 0, errs.join('\n'));
+  await ctx.close();
+});
+
+await test('the minimap is not left black once the whole map is explored', async () => {
+  const { ctx, p, errs } = await freshPage();
+  await p.goto(url('&reset=1')); await p.waitForSelector('body[data-ready="1"]');
+  await p.evaluate(() => { document.getElementById('begin-btn').click(); window.ironcrown.SETTINGS.minimap = true; });
+  await p.waitForTimeout(400);
+  await p.evaluate(() => window.cheats.reveal());
+  await p.waitForTimeout(2200);
+  const dark = await p.evaluate(() => {
+    const c = document.getElementById('minimap'), d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+    let n = 0, k = 0; for (let i = 0; i < d.length; i += 4 * 13) { n++; if (d[i] + d[i + 1] + d[i + 2] < 70) k++; }
+    return k / n;
+  });
+  assert(dark < 0.3, `minimap shows the explored world (${Math.round(dark * 100)}% dark)`);
+  assert(errs.length === 0, errs.join('\n'));
+  await ctx.close();
+});
+
+await test('a slow or missing save server never holds up the map', async () => {
+  const { ctx, p, errs } = await freshPage();
+  await p.route('**/api/health', () => { /* never answers */ });
+  const t0 = Date.now();
+  await p.goto(url('&reset=1')); await p.waitForSelector('body[data-ready="1"]', { timeout: 10000 });
+  const ms = Date.now() - t0;
+  assert(ms < 6000, `ready in ${ms}ms despite a hung server`);
+  assert(errs.length === 0, errs.join('\n'));
+  await ctx.close();
 });
 
 await test('no uncaught errors in the console', async () => { assert(errors.length === 0, errors.slice(0, 5).join('\n')); });

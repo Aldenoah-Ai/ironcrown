@@ -44,7 +44,7 @@ function showSettings() {
     ${chk('invertDrag', 'Invert drag direction')}
     ${chk('edgeScroll', 'Edge scrolling (move the mouse to the screen edge)')}
     <div class="setting"><span>Zoom speed</span>${sel('zoomSpeed', [[0.5, 'Slow'], [1, 'Normal'], [1.8, 'Fast']])}</div>
-    ${chk('minimap', 'Show minimap on the World map')}
+    ${chk('minimap', 'Show the minimap')}
     <h3>Display</h3>
     ${chk('showGrid', 'Show hex grid lines')}
     ${chk('prodNumbers', 'Floating production numbers')}
@@ -115,14 +115,24 @@ function showBoxOpening(box, reward) {
   }, 1300);
 }
 
+// A different realm arrived without a page load (reset, import): drop
+// everything that belonged to the old one.
+function swapRealm() {
+  CATCHUP.left = 0;
+  Battles.list = []; Battles.focus = null;
+  UI.fx = []; UI.selected = null; UI.selEntity = null; UI.worldSel = -1; UI.selHex = -1; UI.placing = null;
+  flushRenderCaches();
+  UI.panelDirty = true; UI.lastPanelHtml = '';
+}
+
 /* ---------- view / tab ---------- */
 // One map: K flies to your capital, M zooms out over the world.
 function setView(v) {
-  if (v === 'kingdom') { CAM.z = Math.max(CAM.z, 4.5); CAM.x = WG.cx[S.world.capital]; CAM.y = WG.cy[S.world.capital]; CAM.clamp(); }
-  else { CAM.z = 0.6; CAM.clamp(); }
+  if (v === 'kingdom') CAM.flyToHex(S.world.capital, Math.max(CAM.z, 4.5));
+  else CAM.flyTo(CAM.x, CAM.y, 0.6);
   UI.panelDirty = true;
 }
-function flyToCity() { if (CAM.z < 2.5) { CAM.z = 4.5; CAM.x = WG.cx[S.world.capital]; CAM.y = WG.cy[S.world.capital]; CAM.clamp(); } }
+function flyToCity() { if (CAM.z < 2.5) CAM.flyToHex(S.world.capital, 4.5); }
 function setTab(t) {
   if (!PANEL_TABS.includes(t)) t = 'info';
   UI.tab = t;
@@ -139,7 +149,7 @@ function selectEntity(kind, id) {
   UI.selEntity = { kind, id };
   const e = selectedEntity();
   if (!e) return;
-  CAM.centerOn(e.at); if (CAM.z > 3) CAM.z = 2.2; CAM.clamp();
+  CAM.flyToHex(e.at, Math.min(CAM.z, 2.2));
   setTab('map');
 }
 
@@ -150,7 +160,7 @@ const inputVal = (id) => { const e = el(id); return e && e.value != null ? Strin
 const ACTIONS = {
   place(t) { const l = buildLockReason(t); if (l) return toast(l, 'bad'); flyToCity(); setTab('info'); UI.placing = t; UI.selected = null; updatePlacingHint(); },
   'cancel-place'() { UI.placing = null; updatePlacingHint(); },
-  select(id) { UI.selected = +id; const b = S.buildings.find((x) => x.id === +id); if (b && CAM.z < 2.5) { CAM.z = 4.5; CAM.centerOn(b.hex); } setTab('info'); },
+  select(id) { UI.selected = +id; const b = S.buildings.find((x) => x.id === +id); if (b && CAM.z < 2.5) CAM.flyToHex(b.hex, 4.5); setTab('info'); },
   'build-at'(arg) { const [t, i] = arg.split(':'); const b = placeBuilding(t, +i); if (b) { UI.selected = b.id; setTab('info'); } },
   deselect() { UI.selected = null; UI.selHex = -1; },
   upgrade(id) { upgradeBuilding(S.buildings.find((b) => b.id === +id)); },
@@ -169,9 +179,9 @@ const ACTIONS = {
     else { if (!pay({ gold: Math.round(100 * (2.2 - 0.15 * port.level - 0.1 * R('trade'))) })) return toast('Not enough gold', 'bad'); gain({ [r]: 100 }); }
   },
   'world-deselect'() { UI.worldSel = -1; },
-  'focus-kingdom'(kid) { const k = S.kingdoms[+kid]; UI.worldSel = k.capital; CAM.centerOn(k.capital); setTab('map'); },
-  'focus-hex'(i) { UI.worldSel = +i; CAM.centerOn(+i); if (CAM.z > 3) CAM.z = 2.2; CAM.clamp(); setTab('map'); },
-  'focus-entity'() { const e = selectedEntity(); if (e) CAM.centerOn(e.at); },
+  'focus-kingdom'(kid) { const k = S.kingdoms[+kid]; UI.worldSel = k.capital; CAM.flyToHex(k.capital); setTab('map'); },
+  'focus-hex'(i) { UI.worldSel = +i; CAM.flyToHex(+i, Math.min(CAM.z, 2.2)); setTab('map'); },
+  'focus-entity'() { const e = selectedEntity(); if (e) CAM.flyToHex(e.at); },
   'select-entity'(arg) { const [k, id] = arg.split(':'); selectEntity(k, id); },
   'deselect-entity'() { UI.selEntity = null; },
   'toggle-guard'(id) {
@@ -265,20 +275,20 @@ const ACTIONS = {
   },
   import() { showModal(`<h2>Import save</h2><textarea id="import-data"></textarea><div class="actions">${btn('Cancel', 'close-modal', '', { cls: 'ghost' })}${btn('Import', 'import-yes')}</div>`); },
   'import-yes'() {
-    try { const d = unpackState(JSON.parse(decodeURIComponent(escape(atob(el('import-data').value.trim()))))); if (d.version !== SAVE_VERSION) throw 0; S = d; deriveKingdom(); deriveWorld(); fogDirty = true; save(); closeModal(); resetView(); toast('Save imported', 'good'); }
+    try { const d = unpackState(JSON.parse(decodeURIComponent(escape(atob(el('import-data').value.trim()))))); if (d.version !== SAVE_VERSION) throw 0; S = d; deriveKingdom(); deriveWorld(); swapRealm(); save(); closeModal(); resetView(); toast('Save imported', 'good'); }
     catch { toast('Invalid save code', 'bad'); }
   },
   reset() { showModal(`<h2>Reset everything?</h2><p>Your kingdom will be lost forever.</p><div class="actions">${btn('Cancel', 'close-modal', '', { cls: 'ghost' })}${btn('Reset', 'reset-yes', '', { cls: 'red' })}</div>`); },
-  'reset-yes'() { storage.del(SAVE_KEY); newGame(); fogDirty = true; resetView(); showWelcome(); },
+  'reset-yes'() { storage.del(SAVE_KEY); newGame(); swapRealm(); resetView(); showWelcome(); },
   'fast-preset'() {
     Object.assign(SETTINGS, { graphics: 'low', resolution: 'performance', minimap: false, particles: false, showGrid: false, autoQuality: true });
     saveSettings(); worldVersion++; resize(); UI.lastPanelHtml = '';
     toast('⚡ Set for speed: low-poly, performance resolution, no minimap', 'good');
     showSettings();
   },
-  'zoom-in'() { CAM.zoomAt(CW / 2, CH / 2, 1.3); },
-  'zoom-out'() { CAM.zoomAt(CW / 2, CH / 2, 0.77); },
-  'zoom-home'() { CAM.centerOn(S.world.capital); },
+  'zoom-in'() { CAM.zoomSmooth(CW / 2, CH / 2, 1.3); },
+  'zoom-out'() { CAM.zoomSmooth(CW / 2, CH / 2, 0.77); },
+  'zoom-home'() { CAM.flyToHex(S.world.capital); },
 };
 function issueOrder(e, kind, i) {
   if (!e || i < 0) return;
@@ -290,7 +300,7 @@ function issueOrder(e, kind, i) {
 }
 function resetView() {
   UI.selected = null; UI.placing = null; UI.worldSel = -1; UI.selEntity = null; UI.selHex = -1;
-  CAM.z = 5.5; CAM.centerOn(S.world.capital);
+  CAM.stop(); CAM.z = 5.5; CAM.centerOn(S.world.capital);
   setTab('info');
 }
 
@@ -363,6 +373,7 @@ function bindInput() {
     if (k === '+' || k === '=') ACTIONS['zoom-in']();
     if (k === '-') ACTIONS['zoom-out']();
     if (k === ' ' || k === 'home') { e.preventDefault(); ACTIONS['zoom-home'](); }
+    if (/^[1-9]$/.test(k) && !e.ctrlKey && !e.metaKey && !e.altKey) setTab(PANEL_TABS[+k - 1]);
     if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(k)) { keysDown.add(k); if (k.startsWith('arrow')) e.preventDefault(); }
   });
   document.addEventListener('keyup', (e) => keysDown.delete(e.key.toLowerCase()));
@@ -388,7 +399,7 @@ function bindInput() {
     if (pointers.has(e.pointerId)) pointers.set(e.pointerId, p);
     if (pointers.size === 2) {
       const [a, b] = [...pointers.values()], d = dist(a.x, a.y, b.x, b.y);
-      if (pinchDist) CAM.zoomAt((a.x + b.x) / 2, (a.y + b.y) / 2, d / pinchDist);
+      if (pinchDist) { CAM.stop(); CAM.zoomAt((a.x + b.x) / 2, (a.y + b.y) / 2, d / pinchDist); }
       pinchDist = d;
       return;
     }
@@ -418,13 +429,20 @@ function bindInput() {
   cv.addEventListener('pointerup', end);
   cv.addEventListener('pointercancel', (e) => { pointers.delete(e.pointerId); drag = null; });
   cv.addEventListener('pointerleave', () => { mouse.inside = false; UI.hover = -1; el('tooltip').hidden = true; });
-  cv.addEventListener('wheel', (e) => { e.preventDefault(); const p = local(e); CAM.zoomAt(p.x, p.y, Math.exp(-e.deltaY * 0.0015 * SETTINGS.zoomSpeed)); }, { passive: false });
+  cv.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const p = local(e), dy = e.deltaMode === 1 ? e.deltaY * 33 : e.deltaMode === 2 ? e.deltaY * 400 : e.deltaY;
+    const f = Math.exp(-clamp(dy, -600, 600) * 0.0015 * SETTINGS.zoomSpeed);
+    // Trackpads send a stream of tiny deltas that already feel smooth; a mouse
+    // wheel's big notches glide instead of jumping.
+    if (Math.abs(dy) < 40) { CAM.stop(); CAM.zoomAt(p.x, p.y, f); } else CAM.zoomSmooth(p.x, p.y, f);
+  }, { passive: false });
   cv.addEventListener('contextmenu', (e) => e.preventDefault());
 
   // minimap: click / drag to jump
   const mm = el('minimap');
-  const mmMove = (e) => { const r = mm.getBoundingClientRect(); CAM.x = ((e.clientX - r.left) / r.width) * WG.pw; CAM.y = ((e.clientY - r.top) / r.height) * WG.ph; CAM.clamp(); };
-  mm.addEventListener('pointerdown', (e) => { mm.setPointerCapture(e.pointerId); mmMove(e); mm.dataset.drag = '1'; });
+  const mmMove = (e) => { const r = mm.getBoundingClientRect(); CAM.stop(); CAM.x = ((e.clientX - r.left) / r.width) * WG.pw; CAM.y = ((e.clientY - r.top) / r.height) * WG.ph; CAM.clamp(); };
+  mm.addEventListener('pointerdown', (e) => { mm.setPointerCapture(e.pointerId); const r = mm.getBoundingClientRect(); CAM.flyTo(((e.clientX - r.left) / r.width) * WG.pw, ((e.clientY - r.top) / r.height) * WG.ph); mm.dataset.drag = '1'; });
   mm.addEventListener('pointermove', (e) => { if (mm.dataset.drag) mmMove(e); });
   mm.addEventListener('pointerup', () => { delete mm.dataset.drag; });
 

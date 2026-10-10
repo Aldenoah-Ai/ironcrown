@@ -1,4 +1,4 @@
-# 👑 Ironcrown `v3.4.3`
+# 👑 Ironcrown `v3.5.0`
 
 A browser kingdom-strategy game and living world simulation. Build a kingdom on a hex map, research technologies at
 universities, raise armies and navies, group them into divisions and fleets, explore ruins, caves, forts and
@@ -27,7 +27,7 @@ It's pure HTML5 Canvas + vanilla JavaScript with no build step and no dependenci
 | **Scouts** | Scout parties are units: dispatch one, click any point on the map, and every hex along the route is revealed. They also explore caves and gather intel. |
 | **Expansion** | Almost the whole map is unclaimed, and all of it is takeable. A claim settles a **whole region at once** — radius 1 to 6, growing with the Main Hall — and settlers push a few hexes **past your border into unexplored land**, revealing what they take, so every claim opens a new frontier. Divisions standing on neutral ground can annex it outright. There is no cap on how much land you hold. Raiders target your least-defended hexes. |
 | **Navy & fleets** | Seamen trained at the Port crew every ship. The Shipyard builds Sloops, Cogs, Galleys, Frigates, Galleons and the Man o' War. Grouped into fleets, they can sail, salvage wrecks, burn pirate coves, blockade coastal kingdoms and hunt enemy fleets. Cogs and Galleons ferry divisions across the sea. |
-| **Graphics** | ✨ High (procedural grass, rock, sand, snow and water textures, hill-shading, water caustics and glints, cloud shadows), 🎨 Classic, or 🔷 Low-poly, switchable live in Settings. |
+| **Graphics** | 🔷 Low-poly (the default — fastest), 🎨 Classic, or ✨ High (procedural grass, rock, sand, snow and water textures, hill-shading, water caustics and glints, cloud shadows), switchable live in Settings. |
 | **Armies drawn as armies** | On High graphics, zoom in past 3.2× and a division is no longer a banner with a number: every soldier is drawn, at the size they are in a battle, in ranks — engines and bows behind, horse in the middle, foot leading. Huge hosts draw one figure per handful so the block stays legible. |
 | **Adapts to your machine** | Aimed at ordinary hardware: on an emulated medium laptop (4x CPU throttle, software rasterisation, a 300-building empire on a fully explored map) Classic graphics hold 45–58 fps. An optional governor (on by default) watches the real frame rate and gives ground when it drops — it stops streaming terrain tiles, then renders fewer pixels, then falls back to the flat world image — and climbs back when there's headroom. There's an FPS chip, and one-click **⚡ Make it fast** in Settings. Cached terrain tiles live on a fixed memory budget so panning can't quietly allocate hundreds of megabytes of textures. |
 | **Built to scale** | A 165,000-hex world is rendered in layers: a whole-continent atlas when zoomed out, streamed terrain tiles at four levels of detail in between, and live hex-by-hex drawing up close. Buildings follow the same idea — coloured blocks far out, cached sprites in the middle, live animated art up close — and nothing off screen is drawn at all. Tile counts, territory bonuses, realm components and pathfinding buffers are all cached so nothing sweeps the whole map per frame, and saves are run-length encoded to a fraction of their raw size. |
@@ -36,8 +36,9 @@ It's pure HTML5 Canvas + vanilla JavaScript with no build step and no dependenci
 | **Diplomacy & alliances** | Gifts, non-aggression treaties, trade pacts, tribute, war and peace. You can join AI alliances or found your own, then invite, donate and chat. Allies reinforce you. |
 | **Mystery boxes** | Three boxes with their odds shown. Rewards are generals, resources or items. |
 | **Battle sim** | An animated land and naval battle simulator with real towers, cannons, catapult splash and ship broadsides. You can watch at 1×/2×/4×, skip, or auto-resolve. |
-| **Camera** | Drag to pan, scroll or pinch to zoom, a minimap, and zoom buttons. In Settings you can switch to drag, WASD/arrows, or both, and turn on edge scrolling. |
-| **UI** | Detailed HUD with calendar, builders, research, housing, navy and power. It also has threat alerts with ETAs, rich tooltips, a 16-section help guide (`H` / `?`), settings, and a version label. |
+| **Camera** | Drag or WASD/arrows to pan, scroll or pinch to zoom, a minimap, and zoom buttons. Jumps (home, minimap, focus buttons, `K`/`M`) glide rather than cut, and mouse-wheel zoom eases (instant with *reduce motion*). Settings can limit panning to drag or keys and turn on edge scrolling. |
+| **UI** | Detailed HUD with calendar, builders, research, housing, navy and power. It also has threat alerts with ETAs, rich tooltips, a 16-section help guide (`H` / `?`), settings, and a version label. Keys `1`–`9` switch panel tabs. The side panel is patched in place each second rather than rebuilt, so nothing flickers or loses its hover. |
+| **Loads reliably** | A loading screen until the first frame is drawn. Time away (up to 8 h) is simulated a slice per frame behind a progress banner, with the map already on screen, instead of freezing the page first. A drawing error in one layer can't blank the map (each layer is isolated and the context is reset next frame), a GPU reset rebuilds every cached image, and a slow or absent save server can't hold up start-up. |
 
 ## Project layout
 
@@ -65,7 +66,7 @@ public/                 ← the game; GitHub Pages serves this folder
     ui-actions.js       modals, actions, map input (drag / keys / edge / pinch / wheel)
     main.js             game loop, boot, test hooks, dev cheats
 server/server.py        optional backend (stdlib only): static files + /api/save + /api/leaderboard
-tests/e2e.mjs           Playwright headless-browser suite (57 tests + screenshots)
+tests/e2e.mjs           Playwright headless-browser suite (64 tests + screenshots)
 .github/workflows/deploy.yml   CI: run tests → deploy public/ to GitHub Pages
 deploy.sh               one-shot git init + gh repo create + Pages setup
 ```
@@ -126,6 +127,8 @@ The suite covers:
 - real map buildings fighting as themselves, and towers duelling towers
 - diplomacy, mystery boxes and alliances
 - AI growth, cheats, persistence, the Python API, mobile layout and a clean console
+- start-up robustness: eight hours away loads the map at once and catches up behind it, a wrecked canvas recovers, a GPU reset rebuilds, a hung save server is ignored, the minimap after full exploration
+- low-poly and drag-plus-keys defaults (and the one-time move of older stored settings), number-key tabs, gliding camera, in-place panel updates
 
 ## Deploy to GitHub Pages
 

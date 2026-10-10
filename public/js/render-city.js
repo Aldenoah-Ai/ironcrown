@@ -98,7 +98,7 @@ function drawGlyphs(g, list) {
 const aiCityCache = new Map();
 function aiCity(k) {
   const hit = aiCityCache.get(k.id);
-  if (hit && hit.hall === k.hall && S.time - hit.at < 30) return hit;
+  if (hit && hit.hall === k.hall && hit.cap === k.capital && hit.at <= S.time && S.time - hit.at < 30) return hit;
   const R = 2 + k.hall, rng = mulberry32(k.id * 7919 + k.hall), cap = k.capital;
   const own = (i) => S.world.owner[i] === k.id && buildableTerrain(i);
   const spots = WG.within(cap, R - 1).filter((i) => own(i) && WG.dist(i, cap) >= 2).sort(() => rng() - 0.5);
@@ -112,7 +112,7 @@ function aiCity(k) {
   const wallSet = new Set();
   ring.forEach((i, j) => { if (j % step === 0 && j / step < towers) buildings.push({ id: 3000 + k.id * 100 + j, type: j % 3 === 2 && k.hall >= 3 ? 'cannon' : 'tower', hex: i, level: lvl, build: 0 }); else if (k.hall >= 3) wallSet.add(i); });
   wallSet.forEach((i) => buildings.push({ id: 4000 + i, type: 'wall', hex: i, level: lvl, build: 0, wallSet }));
-  const c = { hall: k.hall, at: S.time, buildings, R };
+  const c = { hall: k.hall, cap: k.capital, at: S.time, buildings, R };
   aiCityCache.set(k.id, c);
   return c;
 }

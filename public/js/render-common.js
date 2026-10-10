@@ -6,19 +6,23 @@
 
 let cv, ctx, CW = 800, CH = 600, DPR = 1;
 
+const reducedMotion = () => !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
 class Camera {
-  constructor(grid, minZ = 0.35, maxZ = 2.8) { this.grid = grid; this.x = grid.pw / 2; this.y = grid.ph / 2; this.z = 1; this.minZ = minZ; this.maxZ = maxZ; }
+  constructor(grid, minZ = 0.35, maxZ = 2.8) { this.grid = grid; this.x = grid.pw / 2; this.y = grid.ph / 2; this.z = 1; this.minZ = minZ; this.maxZ = maxZ; this.fly = null; this.zf = null; }
   toScreen(wx, wy) { return [(wx - this.x) * this.z + CW / 2, (wy - this.y) * this.z + CH / 2]; }
   toWorld(sx, sy) { return [(sx - CW / 2) / this.z + this.x, (sy - CH / 2) / this.z + this.y]; }
   apply(g) { g.setTransform(DPR * this.z, 0, 0, DPR * this.z, DPR * (CW / 2 - this.x * this.z), DPR * (CH / 2 - this.y * this.z)); }
-  clamp() {
+  // The nearest legal view to (x, y, z): zoom limits, and the map kept on screen.
+  limit(x, y, z) {
     const fitZ = Math.min(CW / this.grid.pw, CH / this.grid.ph);
-    this.z = clamp(this.z, Math.max(this.minZ, fitZ * 0.85), this.maxZ);
-    const hw = CW / 2 / this.z, hh = CH / 2 / this.z;
-    this.x = this.grid.pw < hw * 2 ? this.grid.pw / 2 : clamp(this.x, hw - 40, this.grid.pw - hw + 40);
-    this.y = this.grid.ph < hh * 2 ? this.grid.ph / 2 : clamp(this.y, hh - 40, this.grid.ph - hh + 40);
+    z = clamp(z, Math.max(this.minZ, fitZ * 0.85), this.maxZ);
+    const hw = CW / 2 / z, hh = CH / 2 / z;
+    x = this.grid.pw < hw * 2 ? this.grid.pw / 2 : clamp(x, hw - 40, this.grid.pw - hw + 40);
+    y = this.grid.ph < hh * 2 ? this.grid.ph / 2 : clamp(y, hh - 40, this.grid.ph - hh + 40);
+    return [x, y, z];
   }
-  pan(dx, dy) { this.x -= dx / this.z; this.y -= dy / this.z; this.clamp(); }
+  clamp() { [this.x, this.y, this.z] = this.limit(this.x, this.y, this.z); }
+  pan(dx, dy) { this.stop(); this.x -= dx / this.z; this.y -= dy / this.z; this.clamp(); }
   zoomAt(sx, sy, factor) {
     const [wx, wy] = this.toWorld(sx, sy);
     this.z = clamp(this.z * factor, this.minZ, this.maxZ);
@@ -27,7 +31,46 @@ class Camera {
     this.x += wx - nx; this.y += wy - ny;
     this.clamp();
   }
-  centerOn(i) { this.x = this.grid.cx[i]; this.y = this.grid.cy[i]; this.clamp(); }
+  centerOn(i) { this.stop(); this.x = this.grid.cx[i]; this.y = this.grid.cy[i]; this.clamp(); }
+  /* ---- smooth motion: every jump the player asks for glides instead of cutting ---- */
+  flyTo(x, y, z = this.z) {
+    this.zf = null;
+    const [tx, ty, tz] = this.limit(x, y, z);
+    if (reducedMotion()) { this.x = tx; this.y = ty; this.z = tz; this.fly = null; return; }
+    this.fly = { x: tx, y: ty, z: tz, seen: [this.x, this.y, this.z] };
+  }
+  flyToHex(i, z) { this.flyTo(this.grid.cx[i], this.grid.cy[i], z); }
+  // Wheel and +/- zoom ease toward a target, keeping the point under the cursor fixed.
+  zoomSmooth(sx, sy, factor) {
+    this.fly = null;
+    const base = this.zf ? this.zf.z : this.z;
+    const z = this.limit(this.x, this.y, base * factor)[2];
+    if (reducedMotion()) return this.zoomAt(sx, sy, z / this.z);
+    this.zf = { sx, sy, z, seen: this.z };
+  }
+  stop() { this.fly = null; this.zf = null; }
+  settle() { while (this.fly || this.zf) this.tick(1); }
+  tick(dt) {
+    const k = 1 - Math.exp(-Math.max(dt, 0.001) * 11);
+    if (this.zf) {
+      if (Math.abs(this.z - this.zf.seen) > 1e-9) { this.zf = null; }      // something else moved the camera
+      else {
+        const done = Math.abs(Math.log(this.zf.z / this.z)) < 0.004, z0 = this.z;
+        const nz = done ? this.zf.z : Math.exp(Math.log(this.z) + (Math.log(this.zf.z) - Math.log(this.z)) * k);
+        this.zoomAt(this.zf.sx, this.zf.sy, nz / this.z);
+        if (done || this.z === z0) this.zf = null; else this.zf.seen = this.z;
+      }
+    }
+    const f = this.fly;
+    if (!f) return;
+    if (f.seen[0] !== this.x || f.seen[1] !== this.y || f.seen[2] !== this.z) { this.fly = null; return; }
+    const close = Math.hypot(f.x - this.x, f.y - this.y) * this.z < 0.75 && Math.abs(Math.log(f.z / this.z)) < 0.004;
+    if (close) { this.x = f.x; this.y = f.y; this.z = f.z; this.fly = null; this.clamp(); return; }
+    this.z = Math.exp(Math.log(this.z) + (Math.log(f.z) - Math.log(this.z)) * k);
+    this.x += (f.x - this.x) * k; this.y += (f.y - this.y) * k;
+    this.clamp();
+    f.seen = [this.x, this.y, this.z];
+  }
   visible(pad = 1) {
     const [x0, y0] = this.toWorld(0, 0), [x1, y1] = this.toWorld(CW, CH), s = this.grid.size;
     const out = [];
@@ -80,6 +123,32 @@ function renderScale(w, h) {
   const px = w * h * base * base;
   const fit = px > budget ? base * Math.sqrt(budget / px) : base;
   return Math.max(0.5, fit * GOV.scale());
+}
+/* ---- Canvas health ----
+   An exception halfway through a frame can leave the context mid-save(), clipped
+   to a sliver or at zero alpha, and every later frame then draws into nothing:
+   a black world under a perfectly working menu. The next frame starts from a
+   reset context instead. A GPU reset (driver hiccup, sleep, too many tabs) wipes
+   every cached tile and image, so those are thrown away and rebuilt. */
+let canvasPoisoned = false;
+function healCanvas(g) {
+  if (!canvasPoisoned) return;
+  canvasPoisoned = false;
+  if (typeof g.reset === 'function') g.reset();
+  else { const w = cv.width; cv.width = 0; cv.width = w; }
+}
+function flushRenderCaches() {
+  if (typeof chunkCache !== 'undefined') chunkCache.forEach((m) => { while (evictChunk(m)); });
+  atlasBmp = null; atlasJob = null; atlasFull = null; atlasFullVer = -2; ownerBmp = null; ownerBmpVer = -1;
+  fogCanvas = null; fogMask = null; fogClouds = null; fogDirty = true; miniCache = null;
+  if (typeof spriteCache !== 'undefined') spriteCache.clear();
+  if (typeof aiCityCache !== 'undefined') aiCityCache.clear();
+  GFX.pat.clear(); GFX.ctx = null; MAT.pat.clear(); MAT.ctx = null;
+  worldVersion++;
+}
+function watchCanvas() {
+  cv.addEventListener('contextlost', (e) => { e.preventDefault(); });
+  cv.addEventListener('contextrestored', () => { flushRenderCaches(); resize(); });
 }
 function resize() {
   const r = cv.getBoundingClientRect();

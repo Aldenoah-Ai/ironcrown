@@ -200,7 +200,8 @@ function drawFog(g) {
   // Once the whole world is explored the fog layer is entirely transparent, and
   // blitting it across the screen every frame buys nothing at all. The same goes
   // for looking at the middle of a realm you long ago finished scouting.
-  if (seenCount >= WG.N) { if (!fogMask) fogLayer(); return; }
+  // (The mask is still kept current: the minimap is drawn from it.)
+  if (seenCount >= WG.N) { if (!fogMask || fogDirty) { fogBuiltAt = -1e9; fogLayer(); } return; }
   const bb = unseenBounds();
   if (bb) {
     const [x0, y0] = CAM.toWorld(0, 0), [x1, y1] = CAM.toWorld(CW, CH);
@@ -456,7 +457,17 @@ function drawTerritory(g, inView, z, vx0, vy0, vx1, vy1) {
 function drawWorld(g, t, dt) {
   const cam = CAM, z = cam.z, { terrain, feat } = S.world;
   const es = clamp(1.3 / z, 0.22, 1.2);   // map icons keep a steady on-screen size
+  healCanvas(g);
   g.setTransform(DPR, 0, 0, DPR, 0, 0);
+  g.globalAlpha = 1; g.globalCompositeOperation = 'source-over'; g.setLineDash([]);
+  // Each layer is drawn on its own: one that throws is reported and skipped,
+  // and the rest of the map — above all the terrain — still appears.
+  const layer = (name, fn) => {
+    try { fn(); } catch (e) {
+      canvasPoisoned = true; reportError('draw ' + name, e);
+      cam.apply(g); g.globalAlpha = 1; g.globalCompositeOperation = 'source-over'; g.setLineDash([]);
+    }
+  };
   // The terrain covers the screen by itself whenever the view is wholly inside
   // the map, so on those frames the clear is a screenful of wasted fill.
   const [wx0, wy0] = cam.toWorld(0, 0), [wx1, wy1] = cam.toWorld(CW, CH);
@@ -474,6 +485,7 @@ function drawWorld(g, t, dt) {
   const occupied = new Set(S.buildings.map((b) => b.hex));
   const nearView = (i, pad) => WG.cx[i] >= vx0 - pad && WG.cx[i] <= vx1 + pad && WG.cy[i] >= vy0 - pad && WG.cy[i] <= vy1 + pad;
   for (const k of S.kingdoms) if (isSeen(k.capital) && nearView(k.capital, W_HEX * 3 * (3 + k.hall))) for (const b of aiCity(k).buildings) occupied.add(b.hex);
+  layer('terrain', () => {
   if (cheapTerrain) {                                    // the whole continent in one image
     blitView(g, atlasComposite(), ATLAS_S);
   }
@@ -494,10 +506,12 @@ function drawWorld(g, t, dt) {
     }
     drawTerritory(g, inView, z, vx0, vy0, vx1, vy1);
   }
+  });
   // A few hundred feature hexes, checked against the view — never a sweep of
   // every hex on screen (which is tens of thousands when zoomed out).
-  if (z > 0.6 && !atlasOnly) for (const i of featureHexes()) { const f = feat[i]; if (f && inView(i) && isSeen(i) && !occupied.has(i)) drawFeature(g, i, f, t); }
-  if (!atlasOnly) drawCityLayer(g, t, dt, vis, inView);
+  layer('features', () => { if (z > 0.6 && !atlasOnly) for (const i of featureHexes()) { const f = feat[i]; if (f && inView(i) && isSeen(i) && !occupied.has(i)) drawFeature(g, i, f, t); } });
+  layer('city', () => { if (!atlasOnly) drawCityLayer(g, t, dt, vis, inView); });
+  layer('units', () => {
   const icon = (x, y, fn) => { g.save(); g.translate(x, y); g.scale(es, es); fn(); g.restore(); };
   const fullArmies = SETTINGS.graphics === 'high' && z >= ARMY_Z && GOV.level < 1;   // every soldier, not a flag
   armyBudget = ARMY_FRAME_SPRITES;
@@ -580,10 +594,11 @@ function drawWorld(g, t, dt) {
       drawBanner(g, 0, water ? -10 : 0, d.color, '', armyHousing(d.units), t, d === selE, false);
     });
   }
-  drawCloudShadows(g, WG, t);
-  // fog
-  drawFog(g);
-  Battles.draw(g, t);   // battles stay visible above the fog
+  });
+  layer('clouds', () => drawCloudShadows(g, WG, t));
+  layer('fog', () => drawFog(g));
+  layer('battles', () => Battles.draw(g, t));   // battles stay visible above the fog
+  layer('labels', () => {
   // labels (on top of fog so known names stay readable)
   const fs = 12 / z;
   g.font = `bold ${fs}px sans-serif`; g.textAlign = 'center';
@@ -595,9 +610,10 @@ function drawWorld(g, t, dt) {
   // selection + hover
   if (UI.worldSel >= 0 && !UI.selected) { g.strokeStyle = '#fff'; g.lineWidth = 2.5 / z; g.beginPath(); WG.hexPath(g, UI.worldSel, 0.92); g.stroke(); g.strokeStyle = '#f2c14e'; g.lineWidth = 1.5 / z; g.beginPath(); WG.hexPath(g, UI.worldSel, 1.05); g.stroke(); }
   if (UI.hover >= 0 && !UI.placing) { g.strokeStyle = 'rgba(255,255,255,.6)'; g.lineWidth = 1.5 / z; g.beginPath(); WG.hexPath(g, UI.hover, 0.95); g.stroke(); }
+  });
   g.setTransform(DPR, 0, 0, DPR, 0, 0);
-  drawAtmosphere(g);
-  drawMinimap(t);
+  layer('atmosphere', () => { g.setTransform(DPR, 0, 0, DPR, 0, 0); drawAtmosphere(g); });
+  layer('minimap', () => drawMinimap(t));
 }
 
 /* ---------- minimap ---------- */

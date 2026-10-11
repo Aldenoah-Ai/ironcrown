@@ -203,9 +203,9 @@ function renderInfo() {
 }
 function renderObstacle(i) {
   const o = obstacleAt(i);
-  return `<div class="row"><span class="big-ico">${o === 'tree' ? '🌲' : '🪨'}</span><div><h2>${o === 'tree' ? 'Trees' : 'Rocks'}</h2><div class="muted small">Blocking a building plot</div></div><span class="spacer"></span><button class="icon-btn" data-action="deselect">✕</button></div>
-    <p class="small">Clear this hex to free space for building. You'll get ${o === 'tree' ? '🪵60 lumber' : '⛓️40 iron (and maybe a gem)'}.</p>
-    ${btn('🪓 Clear for 🪙25', 'clear-obstacle', i, { cls: 'block', disabled: !inLand(i), title: inLand(i) ? '' : 'Outside your land' })}`;
+  return `<div class="row"><span class="big-ico">${o === 'tree' ? '🌲' : '⛰️'}</span><div><h2>${o === 'tree' ? 'Trees' : 'Rocks'}</h2><div class="muted small">Blocking a building plot</div></div><span class="spacer"></span><button class="icon-btn" data-action="deselect">✕</button></div>
+    <p class="small">Clear this hex to free space for building. You'll get ${o === 'tree' ? '🌳60 lumber' : '⛓️40 iron (and maybe a gem)'}.</p>
+    ${btn('⛏️ Clear for 💰25', 'clear-obstacle', i, { cls: 'block', disabled: !inLand(i), title: inLand(i) ? '' : 'Outside your land' })}`;
 }
 function objectivesCard() {
   const done = S.objectives || {};
@@ -269,7 +269,7 @@ function renderBuildingInfo(b) {
   if (d.research) h += `<h3>Research</h3>` + uniCard(b) + `<p class="small">${btn('🎓 Open research tree', 'tab', 'research', { cls: 'sm ghost' })}</p>`;
   if (b.type === 'port' && b.level > 0) {
     const sell = (0.5 + 0.1 * b.level + 0.1 * R('trade')).toFixed(2), buy = (2.2 - 0.15 * b.level - 0.1 * R('trade')).toFixed(2);
-    h += `<h3>Market</h3><p class="small muted">Sell 200 goods for ${sell}🪙 each · buy 100 goods for ${buy}🪙 each.</p><div class="row wrap">`;
+    h += `<h3>Market</h3><p class="small muted">Sell 200 goods for ${sell}💰 each · buy 100 goods for ${buy}💰 each.</p><div class="row wrap">`;
     for (const r of ['lumber', 'iron', 'food']) h += btn(`Sell 200 ${RES_META[r].icon}`, 'trade', 'sell:' + r, { cls: 'sm ghost' }) + btn(`Buy 100 ${RES_META[r].icon}`, 'trade', 'buy:' + r, { cls: 'sm ghost' });
     h += '</div>';
   }
@@ -376,7 +376,7 @@ function fleetCard(f) {
 }
 function renderNavy() {
   let h = `<h2>Navy</h2><dl class="kv"><dt>Ships (all)</dt><dd>${shipCount(allShips())} + ${queuedShips()} queued</dd><dt>Troop transport capacity</dt><dd>🚣 ${transportCapacity()}</dd>
-    <dt>Ship upkeep</dt><dd>🪙 ${(upkeep().gold * 60).toFixed(1)}/min</dd>${S.winds > 0 ? `<dt>Favourable winds</dt><dd>🌬️ ${fmtTime(S.winds)}</dd>` : ''}</dl>
+    <dt>Ship upkeep</dt><dd>💰 ${(upkeep().gold * 60).toFixed(1)}/min</dd>${S.winds > 0 ? `<dt>Favourable winds</dt><dd>🌬️ ${fmtTime(S.winds)}</dd>` : ''}</dl>
     <h3>Seamen · ${S.army.seaman} ready</h3><p class="small muted">Every ship needs a crew of Seamen, trained at the Port. Crews go down with their ship.</p>${unitRow('seaman')}
     <h3>Home harbour</h3><div class="pills">${unitList(S.harbor, SHIPS)}</div><p class="small muted">Ships in harbour defend your port from pirates. Fleets can also dock at any Dock you build on the coast.</p>
     <h3>Fleets · ${S.fleets.length}/${fleetLimit()}</h3>
@@ -408,7 +408,7 @@ function renderGenerals() {
       <div class="row" style="margin-top:6px"><span class="small muted">Post</span><select data-assign="${og.uid}">${posts.map(([k, id, label]) => `<option value="${k}:${id}" ${cur === `${k}:${id}` ? 'selected' : ''}>${esc(label)}</option>`).join('')}</select>
       ${spare && og.stars < 5 ? btn('⭐ Promote', 'promote', og.uid, { cls: 'sm', title: 'Merge an idle spare copy into this general' }) : ''}</div></div>`;
   }
-  h += `<div class="card small">🍺 Need more commanders? ${btn('Hire at the Tavern 🪙900', 'hire', '', { cls: 'sm', disabled: S.res.gold < 900 })}</div>`;
+  h += `<div class="card small">🍺 Need more commanders? ${btn('Hire at the Tavern 💰900', 'hire', '', { cls: 'sm', disabled: S.res.gold < 900 })}</div>`;
   h += '<h3>Items</h3>';
   for (const [k, it] of Object.entries(ITEMS)) {
     h += `<div class="card"><div class="row"><span class="big-ico sm">${it.icon}</span><div><b>${it.name}</b> <span class="muted">× ${S.items[k]}</span><div class="small muted">${it.desc}</div></div><span class="spacer"></span>
@@ -426,7 +426,7 @@ function renderShop() {
       <div class="odds">${Object.entries(b.rarity).filter(([, v]) => v).map(([r, v]) => `<span class="r-${r}">${RARITY[r].name} ${v}%</span>`).join('')}</div>
       <div class="row">${costHtml(b.cost, S.res)}<span class="spacer"></span>${btn('Open', 'open-box', b.id, { disabled: !canAfford(b.cost) })}</div></div></div></div>`;
   }
-  h += `<h3>🍺 Tavern</h3><div class="card"><div class="row"><span class="big-ico">🍺</span><div><b>Hire a general</b><div class="small muted">A wandering commander joins you (usually common, 15% rare). Every division needs its own general.</div></div><span class="spacer"></span>${btn('Hire 🪙900', 'hire', '', { disabled: S.res.gold < 900 })}</div></div>`;
+  h += `<h3>🍺 Tavern</h3><div class="card"><div class="row"><span class="big-ico">🍺</span><div><b>Hire a general</b><div class="small muted">A wandering commander joins you (usually common, 15% rare). Every division needs its own general.</div></div><span class="spacer"></span>${btn('Hire 💰900', 'hire', '', { disabled: S.res.gold < 900 })}</div></div>`;
   return h + `<p class="small muted">Boxes opened: ${S.stats.boxesOpened} · Generals owned: ${S.generals.length}</p>`;
 }
 
@@ -539,10 +539,10 @@ function kingdomCard(k) {
   let h = `<div class="card hl"><div class="row"><span class="dot" style="background:${k.color};width:16px;height:16px"></span><div><b>${k.name}</b><div class="small muted">${k.ruler} · ${PERSONALITIES[k.personality].name}${k.coastal ? ' · coastal' : ''}</div></div></div>
     <dl class="kv" style="margin-top:8px"><dt>Relation</dt><dd>${relationBar(k)}</dd><dt>Alliance</dt><dd>${a ? a.emblem + ' ' + esc(a.name) : '—'}</dd>
     ${k.treaty > 0 ? `<dt>Treaty</dt><dd>🕊️ ${fmtTime(k.treaty)}</dd>` : ''}${k.tradePact ? '<dt>Trade pact</dt><dd>⚖️ +5% gold</dd>' : ''}`;
-  if (intel) h += `<dt>Keep level</dt><dd>${intel.hall}</dd><dt>Army (est.)</dt><dd>⚡ ~${fmt(intel.power)}</dd><dt>Defenses (est.)</dt><dd>🛡️ ~${fmt(intel.defense)}</dd>${k.coastal ? `<dt>Navy (est.)</dt><dd>⚓ ~${fmt(intel.navy)}</dd>` : ''}<dt>Treasury</dt><dd>🪙${fmt(intel.res.gold)} 🪵${fmt(intel.res.lumber)}</dd><dt>Intel age</dt><dd>${fmtTime(S.time - intel.t)}</dd>`;
+  if (intel) h += `<dt>Keep level</dt><dd>${intel.hall}</dd><dt>Army (est.)</dt><dd>⚡ ~${fmt(intel.power)}</dd><dt>Defenses (est.)</dt><dd>🛡️ ~${fmt(intel.defense)}</dd>${k.coastal ? `<dt>Navy (est.)</dt><dd>⚓ ~${fmt(intel.navy)}</dd>` : ''}<dt>Treasury</dt><dd>💰${fmt(intel.res.gold)} 🌳${fmt(intel.res.lumber)}</dd><dt>Intel age</dt><dd>${fmtTime(S.time - intel.t)}</dd>`;
   else h += '<dt>Intel</dt><dd class="muted">Unknown — send scouts</dd>';
-  h += `</dl><h3>Diplomacy</h3><div class="row wrap">${btn('🎁 Gift 🪙200', 'diplo', 'gift:' + k.id, { cls: 'ghost sm' })}
-    ${k.atWar ? btn(`🕊️ Make peace 🪙${400 * k.hall}`, 'diplo', 'peace:' + k.id, { cls: 'sm' }) : btn('🕊️ Treaty 🪙400', 'diplo', 'treaty:' + k.id, { cls: 'ghost sm', title: 'Non-aggression for 20 min (relation 10+)' })}
+  h += `</dl><h3>Diplomacy</h3><div class="row wrap">${btn('🎁 Gift 💰200', 'diplo', 'gift:' + k.id, { cls: 'ghost sm' })}
+    ${k.atWar ? btn(`🕊️ Make peace 💰${400 * k.hall}`, 'diplo', 'peace:' + k.id, { cls: 'sm' }) : btn('🕊️ Treaty 💰400', 'diplo', 'treaty:' + k.id, { cls: 'ghost sm', title: 'Non-aggression for 20 min (relation 10+)' })}
     ${btn(k.tradePact ? '⚖️ End pact' : '⚖️ Trade pact', 'diplo', 'pact:' + k.id, { cls: 'ghost sm', title: 'Relation 35+: +5% gold' })}
     ${btn('💰 Demand tribute', 'diplo', 'tribute:' + k.id, { cls: 'ghost sm' })}
     ${!k.atWar && !allied ? btn('⚔️ Declare war', 'diplo', 'war:' + k.id, { cls: 'red sm' }) : ''}
@@ -625,7 +625,7 @@ function buildHereCard(i, neutral) {
   if (!buildableTerrain(i) || buildingAt(i)) return '';
   const o = obstacleAt(i), protectedHex = defensesNear(i, 3).length > 0;
   let h = `<div class="card"><h3 style="margin-top:0">Build here${neutral ? ' <span class="muted small">(also settles this hex: +' + costHtml(hexClaimCost(i)) + ')</span>' : ''}</h3>`;
-  if (o) h += `<div class="row small">${o === 'tree' ? '🌲 Trees' : '🪨 Rocks'} cover this hex.<span class="spacer"></span>${neutral ? '' : btn('🪓 Clear 🪙25', 'clear-obstacle', i, { cls: 'sm ghost' })}</div>`;
+  if (o) h += `<div class="row small">${o === 'tree' ? '🌲 Trees' : '⛰️ Rocks'} cover this hex.<span class="spacer"></span>${neutral ? '' : btn('⛏️ Clear 💰25', 'clear-obstacle', i, { cls: 'sm ghost' })}</div>`;
   if (!protectedHex) h += '<div class="small muted">⚠️ No tower, cannon, spire, fortress or wall nearby: buildings here are raided far more often.</div>';
   h += '<div class="tb-grid">';
   let any = false;

@@ -50,7 +50,7 @@ function createAlliance(name, color, emblem) {
   if (S.allianceId) return false;
   if (name.length < 3) { toast('Alliance name needs at least 3 characters', 'bad'); return false; }
   if (S.alliances.some((a) => a.name.toLowerCase() === name.toLowerCase())) { toast('That name is taken', 'bad'); return false; }
-  if (!pay({ gold: 1000 })) { toast('Founding an alliance costs 🪙1000', 'bad'); return false; }
+  if (!pay({ gold: 1000 })) { toast('Founding an alliance costs 💰1000', 'bad'); return false; }
   const a = { id: 'p' + uid(), name, emblem, color, members: ['P'], leader: 'P', open: true, minHall: 1, level: 1, xp: 0, chat: [] };
   S.alliances.push(a);
   S.allianceId = a.id;

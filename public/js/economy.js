@@ -41,7 +41,7 @@ function clearObstacle(i) {
   const o = obstacleAt(i);
   if (!o) return false;
   if (!inLand(i)) { toast('You must own this hex first', 'bad'); return false; }
-  if (!pay({ gold: 25 })) { toast('Clearing costs 🪙25', 'bad'); return false; }
+  if (!pay({ gold: 25 })) { toast('Clearing costs 💰25', 'bad'); return false; }
   S.cleared.push(i);
   markChunks(i);
   const loot = o === 'tree' ? { lumber: 60 } : Math.random() < 0.15 ? { iron: 40, diamonds: 2 } : { iron: 40 };

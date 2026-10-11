@@ -411,3 +411,7 @@ code { background: var(--bg2); padding: 1px 5px; border-radius: 4px; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
 }
+
+/* Save import: a file picker styled as a button */
+.file-pick { display: inline-block; margin: 4px 0; }
+.file-pick input { display: none; }

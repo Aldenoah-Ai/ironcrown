@@ -1359,6 +1359,140 @@ await test('a slow or missing save server never holds up the map', async () => {
   await ctx.close();
 });
 
+await test('every icon is an emoji older systems can draw (no blank resource icons)', async () => {
+  const { readFileSync, readdirSync } = await import('node:fs');
+  // Emoji 12+ (2019 on) are missing on Windows 10 and older phones: 🪙 🪵 and friends showed as blanks.
+  const tooNew = (o) => (o >= 0x1fa70 && o <= 0x1faff) || (o >= 0x1f7e0 && o <= 0x1f7eb) || [0x1f9cc, 0x1f6d5, 0x1f6fa, 0x1f90d, 0x1f971, 0x1f97b].includes(o);
+  const files = ['index.html', ...readdirSync(path.join(root, 'public/js')).map((f) => 'js/' + f)];
+  const bad = [];
+  for (const f of files) for (const ch of readFileSync(path.join(root, 'public', f), 'utf8')) if (tooNew(ch.codePointAt(0))) bad.push(`${f}: ${ch}`);
+  assert(bad.length === 0, 'too-new emoji: ' + [...new Set(bad)].join(', '));
+  const icons = await G(() => Object.values(RES_META).map((r) => r.icon).join(''));
+  assert(icons.includes('💰') && icons.includes('🌳'), `resource icons ${icons}`);
+});
+
+await test('raids are about ten times rarer, and none are sent while you are away from the screen', async () => {
+  const r = await G(() => {
+    const keep = { t: S.raidTimer, last: window.ironcrown.UI.lastInput };
+    const gaps = []; for (let i = 0; i < 40; i++) { scheduleRaid(); gaps.push(S.raidTimer); }
+    // idle: the clock towards the next raid stands still
+    S.raidTimer = 500; window.ironcrown.UI.lastInput = Date.now() - 10 * 60e3;
+    step(20); const idleT = S.raidTimer;
+    window.ironcrown.UI.lastInput = Date.now();
+    step(20); const activeT = S.raidTimer;
+    S.raidTimer = keep.t; window.ironcrown.UI.lastInput = keep.last;
+    return { min: Math.min(...gaps), idleT, activeT, hall: hallLevel() };
+  });
+  assert(r.min > 1000, `the shortest gap between raids is ${Math.round(r.min)}s (hall ${r.hall}), not five minutes`);
+  assert(r.idleT === 500, `no countdown while idle (${r.idleT})`);
+  assert(r.activeT < 500, 'the countdown resumes when you are back');
+});
+
+await test('a kingdom that joins your alliance calls off the army it sent against you', async () => {
+  const { ctx, p, errs } = await freshPage();
+  await p.goto(url('&reset=1')); await p.waitForSelector('body[data-ready="1"]');
+  const r = await p.evaluate(() => {
+    document.getElementById('begin-btn').click();
+    cheats.res(1e5); S.shield = 0;
+    const k = S.kingdoms.find((x) => canReachCapital(x));
+    const a = launchRaid(k, S.world.capital);
+    if (!a) return { skipped: true };
+    createAlliance('Test Concord', '#57c26b', '🤝');
+    const rnd = Math.random; Math.random = () => 0; inviteKingdom(k.id); Math.random = rnd;
+    const lost0 = S.stats.raidsLost;
+    window.ironcrown.debug.fastForward(1200);
+    return { joined: k.allianceId === S.allianceId, raids: S.aiArmies.filter((x) => x.kid === k.id && x.kind === 'raid').length, lost: S.stats.raidsLost - lost0,
+      log: S.log.slice(0, 30).some((l) => /called off the army/.test(l.text)) };
+  });
+  if (!r.skipped) {
+    assert(r.joined, 'the kingdom joined');
+    assert(r.raids === 0 && r.lost === 0, `no raid from an ally (${r.raids} marching, ${r.lost} pillaged)`);
+    assert(r.log, 'the log says the army was called off');
+  }
+  assert(errs.length === 0, errs.join('\n'));
+  await ctx.close();
+});
+
+await test('while the game catches up on time away, raids turn back and your armies do not fight', async () => {
+  const { ctx, p, errs } = await freshPage();
+  await p.goto(url('&reset=1')); await p.waitForSelector('body[data-ready="1"]');
+  const r = await p.evaluate(() => {
+    document.getElementById('begin-btn').click();
+    cheats.army(60); S.shield = 0;
+    const gid = S.generals.find((g) => generalPost(g.uid).kind === 'none').uid;     // the first general already leads a division
+    const d = window.ironcrown.api.createDivision('Border Watch', { swordsman: 40, archer: 40 }, gid);
+    // park the division right next to a hostile kingdom's guard army
+    const k = S.kingdoms.find((x) => S.aiArmies.some((a) => a.kid === x.id && a.kind === 'guard'));
+    cheats.war(k.id);
+    const g = S.aiArmies.find((a) => a.kid === k.id && a.kind === 'guard');
+    const spot = WG.neighbors(g.at).find((n) => isPassable(n)) ?? g.at;
+    d.at = spot; d.path = [];
+    const raider = S.kingdoms.find((x) => canReachCapital(x) && x !== k);
+    const a = raider && launchRaid(raider, S.world.capital);
+    const troops0 = armyHousing(d.units), lost0 = S.stats.raidsLost, res0 = { ...S.res };
+    queueCatchUp(3 * 3600); finishCatchUp();
+    return { troops0, troops1: armyHousing(d.units), raided: !!a, lost: S.stats.raidsLost - lost0, barred: S.log.some((l) => /found the gates barred/.test(l.text)), gold: [res0.gold, S.res.gold] };
+  });
+  assert(r.troops1 === r.troops0, `the division held its ground (${r.troops0} → ${r.troops1})`);
+  if (r.raided) { assert(r.lost === 0, 'nothing was pillaged while away'); assert(r.barred, 'the log explains the raid turned back'); }
+  assert(errs.length === 0, errs.join('\n'));
+  await ctx.close();
+});
+
+await test('export downloads a small save file, and importing it (or an old-style code) brings the kingdom back', async () => {
+  const { ctx, p, errs } = await freshPage();
+  await p.route('**/api/**', (rt) => rt.abort());
+  await p.goto(url('&reset=1')); await p.waitForSelector('body[data-ready="1"]');
+  await p.fill('#welcome-name', 'Exportia'); await p.click('#begin-btn');
+  await p.evaluate(() => { cheats.time(1200); S.res.gold = 4321; });
+  await p.click('.hud-stats [data-action="menu"]');
+  await p.click('[data-action="export"]');
+  await p.waitForSelector('#export-data');
+  const code = await p.inputValue('#export-data');
+  const raw = await p.evaluate(() => serialize(S).length);
+  assert(code.startsWith('IC2:'), 'compressed code');
+  assert(code.length < raw / 4, `the code is ${Math.round(code.length / 1024)} KB, a quarter of the ${Math.round(raw / 1024)} KB save at most`);
+  const [dl] = await Promise.all([p.waitForEvent('download'), p.click('[data-action="export-file"]')]);
+  assert(/^Exportia-\d{4}-\d\d-\d\d\.ironcrown$/.test(dl.suggestedFilename()), 'file name ' + dl.suggestedFilename());
+  const file = path.join(shots, 'export-test.ironcrown');
+  await dl.saveAs(file);
+  const { readFileSync } = await import('node:fs');
+  assert(readFileSync(file, 'utf8') === code, 'the file holds the save code');
+  await p.keyboard.press('Escape');
+  // start over, then open the file
+  await p.evaluate(() => { ACTIONS['reset-yes'](); document.getElementById('begin-btn').click(); });
+  assert((await p.evaluate(() => S.name)) !== 'Exportia', 'a different kingdom now');
+  await p.click('.hud-stats [data-action="menu"]'); await p.click('[data-action="import"]');
+  await p.setInputFiles('#import-file', file);
+  await p.waitForFunction(() => S.name === 'Exportia', null, { timeout: 5000 });
+  assert(await p.evaluate(() => Math.round(S.res.gold) >= 4321), 'resources came back');
+  // a code from v3.5 or earlier still imports, even pasted with line breaks
+  const old = await p.evaluate(() => { S.name = 'Oldcode'; const c = btoa(unescape(encodeURIComponent(serialize(S)))); S.name = 'Exportia'; return c.replace(/(.{76})/g, '$1\n'); });
+  await p.click('.hud-stats [data-action="menu"]'); await p.click('[data-action="import"]');
+  await p.fill('#import-data', old); await p.click('#import-yes');
+  await p.waitForFunction(() => S.name === 'Oldcode', null, { timeout: 5000 });
+  // and nonsense is refused without touching the game
+  await p.click('.hud-stats [data-action="menu"]'); await p.click('[data-action="import"]');
+  await p.fill('#import-data', 'not a save'); await p.click('#import-yes');
+  await p.waitForTimeout(200);
+  assert((await p.textContent('#import-status')).includes('⚠️'), 'the dialog says why');
+  assert((await p.evaluate(() => S.name)) === 'Oldcode', 'the game is untouched');
+  assert(errs.length === 0, errs.join('\n'));
+  await ctx.close();
+});
+
+if (local) await test('a save kept on the Python server loads when the browser has none', async () => {
+  const { ctx, p, errs } = await freshPage();
+  await p.goto(url('&reset=1')); await p.waitForSelector('body[data-ready="1"]');
+  await p.fill('#welcome-name', 'Cloudia'); await p.click('#begin-btn');
+  await p.evaluate(async () => { save(); API.lastPush = 0; API.push(true); await new Promise((r) => setTimeout(r, 600)); });
+  await p.evaluate(() => { window.removeEventListener('beforeunload', window.save); window.save = () => {}; localStorage.removeItem('ironcrown-save-e2e'); });
+  await p.reload(); await p.waitForSelector('body[data-ready="1"]');
+  assert((await p.evaluate(() => S.name)) === 'Cloudia', 'the realm came back from the server');
+  assert(errs.length === 0, errs.join('\n'));
+  await ctx.close();
+});
+
 await test('no uncaught errors in the console', async () => { assert(errors.length === 0, errors.slice(0, 5).join('\n')); });
 
 await browser.close();

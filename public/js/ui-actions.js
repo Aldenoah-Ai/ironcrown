@@ -30,9 +30,9 @@ function showWelcome() {
     <div class="actions">${btn('📖 Help guide', 'help', '', { cls: 'ghost' })}<button class="btn" data-action="begin" id="begin-btn">Begin your reign</button></div>`);
 }
 function showMenu() {
-  showModal(`<h2>Kingdom menu</h2><dl class="kv"><dt>Version</dt><dd>v${GAME_VERSION}</dd><dt>Save slot</dt><dd>${esc(SLOT)}</dd><dt>Backend</dt><dd>${API.online ? '🟢 Python server (cloud save)' : '⚪ Browser storage'}</dd><dt>Played</dt><dd>${fmtTime(S.time)}</dd></dl>
+  showModal(`<h2>Kingdom menu</h2><dl class="kv"><dt>Version</dt><dd>v${GAME_VERSION}</dd><dt>Save slot</dt><dd>${esc(SLOT)}</dd><dt>Backend</dt><dd>${API.online ? '✅ Python server (cloud save)' : '⚪ Browser storage'}</dd><dt>Played</dt><dd>${fmtTime(S.time)}</dd></dl>
     <h3>Rename kingdom</h3><div class="row"><input type="text" id="rename-input" value="${esc(S.name)}" maxlength="24" />${btn('Rename', 'rename', '', { cls: 'sm' })}</div>
-    <h3>Save data</h3><div class="row wrap">${btn('💾 Save now', 'save', '', { cls: 'sm' })}${btn('Export', 'export', '', { cls: 'sm ghost' })}${btn('Import', 'import', '', { cls: 'sm ghost' })}${btn('Reset game', 'reset', '', { cls: 'sm red' })}</div>
+    <h3>Save data</h3><div class="row wrap">${btn('💾 Save now', 'save', '', { cls: 'sm' })}${btn('📤 Export', 'export', '', { cls: 'sm ghost' })}${btn('📥 Import', 'import', '', { cls: 'sm ghost' })}${btn('Reset game', 'reset', '', { cls: 'sm red' })}</div>
     <div class="actions">${btn('⚙️ Settings', 'settings', '', { cls: 'ghost' })}${btn('📖 Help', 'help', '', { cls: 'ghost' })}${btn('Close', 'close-modal', '', { cls: 'ghost' })}</div>`);
 }
 function showSettings() {
@@ -76,7 +76,7 @@ function sliderRows(pool, table, prefix, defaults = 'all') {
 }
 function generalSelect(id, optional) {
   const idle = idleGenerals();
-  if (!idle.length && !optional) return `<p class="small bad-txt">No idle general! Every division needs its own commander.</p>${btn('🍺 Hire one at the Tavern (🪙900)', 'hire-muster', '', { cls: 'sm' })}<select id="${id}" hidden></select>`;
+  if (!idle.length && !optional) return `<p class="small bad-txt">No idle general! Every division needs its own commander.</p>${btn('🍺 Hire one at the Tavern (💰900)', 'hire-muster', '', { cls: 'sm' })}<select id="${id}" hidden></select>`;
   return `<select id="${id}">${optional ? '<option value="">— no admiral —</option>' : ''}${idle.map((g) => `<option value="${g.uid}">${generalData(g.uid).icon} ${esc(generalData(g.uid).name)} ${'★'.repeat(g.stars)} (${RARITY[generalData(g.uid).rarity].name})</option>`).join('')}</select>`;
 }
 function showMuster() {
@@ -105,7 +105,7 @@ function showBoxOpening(box, reward) {
     if (reward.kind === 'general') {
       const g = reward.general;
       body = `<div class="portrait r-${r}">${g.icon}</div><div class="rarity r-${r}">${RARITY[r].name} General</div><div class="reward-title">${g.name}</div>
-        ${reward.dup ? `<p class="small">${reward.max ? `Already 5★ — converted to 🪙${reward.gold}` : `Duplicate! Now ${'★'.repeat(reward.stars)}`}</p>` : '<p class="small">A new general joins your court! Assign them in the Generals tab.</p>'}
+        ${reward.dup ? `<p class="small">${reward.max ? `Already 5★ — converted to 💰${reward.gold}` : `Duplicate! Now ${'★'.repeat(reward.stars)}`}</p>` : '<p class="small">A new general joins your court! Assign them in the Generals tab.</p>'}
         <div style="max-width:260px;margin:auto;text-align:left">${statBars(generalStats(g.id))}</div>`;
     } else if (reward.kind === 'item') body = `<div style="font-size:70px">${ITEMS[reward.item].icon}</div><div class="reward-title">${reward.qty}× ${ITEMS[reward.item].name}</div><p class="small muted">${ITEMS[reward.item].desc}</p>`;
     else body = `<div style="font-size:70px">💰</div><div class="reward-title">Treasure!</div><p style="font-size:18px">${costHtml(reward.bundle)}</p>`;
@@ -268,15 +268,61 @@ const ACTIONS = {
   begin() { S.name = (el('welcome-name').value || 'Ironcrown').trim().slice(0, 24) || 'Ironcrown'; S.started = true; closeModal(); save(); toast(`Long live ${S.name}!`, 'good'); },
   rename() { const v = inputVal('rename-input').slice(0, 24); if (v) { S.name = v; save(); toast('Kingdom renamed'); } closeModal(); },
   save() { save(); API.push(true); toast('Game saved', 'good'); },
-  export() {
-    const data = btoa(unescape(encodeURIComponent(serialize(S))));
-    showModal(`<h2>Export save</h2><p class="small muted">Copy this code somewhere safe.</p><textarea readonly onclick="this.select()">${data}</textarea><div class="actions">${btn('Close', 'close-modal', '', { cls: 'ghost' })}</div>`);
-    navigator.clipboard?.writeText(data).then(() => toast('Save code copied'), () => {});
+  async export() {
+    const code = await encodeSave(S), raw = serialize(S).length;
+    UI.exportCode = code;
+    const kb = (n) => `${Math.max(1, Math.round(n / 1024))} KB`;
+    showModal(`<h2>Export save</h2>
+      <p class="small">Download a save file to keep or send, or copy the save code. Either one restores this kingdom with <b>☰ Menu → Import</b>, in any browser.</p>
+      <div class="row wrap">${btn('💾 Download save file', 'export-file')}${btn('📋 Copy save code', 'export-copy', '', { cls: 'ghost' })}</div>
+      <p class="small muted">Save code · ${kb(code.length)}${code.startsWith(SAVE_CODE_PREFIX) ? ` (compressed from ${kb(raw)})` : ''}</p>
+      <textarea id="export-data" readonly onclick="this.select()">${code}</textarea>
+      <div class="actions">${btn('Close', 'close-modal', '', { cls: 'ghost' })}</div>`);
   },
-  import() { showModal(`<h2>Import save</h2><textarea id="import-data"></textarea><div class="actions">${btn('Cancel', 'close-modal', '', { cls: 'ghost' })}${btn('Import', 'import-yes')}</div>`); },
-  'import-yes'() {
-    try { const d = unpackState(JSON.parse(decodeURIComponent(escape(atob(el('import-data').value.trim()))))); if (d.version !== SAVE_VERSION) throw 0; S = d; deriveKingdom(); deriveWorld(); swapRealm(); save(); closeModal(); resetView(); toast('Save imported', 'good'); }
-    catch { toast('Invalid save code', 'bad'); }
+  'export-file'() {
+    const code = UI.exportCode;
+    if (!code) return;
+    const day = new Date().toISOString().slice(0, 10), name = (S.name || 'Ironcrown').replace(/[^\w-]+/g, '_');
+    const url = URL.createObjectURL(new Blob([code], { type: 'text/plain' }));
+    const a = document.createElement('a');
+    a.href = url; a.download = `${name}-${day}.ironcrown`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+    toast('Save file downloaded', 'good');
+  },
+  'export-copy'() {
+    const code = UI.exportCode;
+    if (!code) return;
+    const done = () => toast('Save code copied', 'good');
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(code).then(done, () => { el('export-data').select(); document.execCommand('copy'); done(); });
+    else { el('export-data').select(); document.execCommand('copy'); done(); }
+  },
+  import() {
+    showModal(`<h2>Import save</h2>
+      <p class="small">Open a save file, or paste a save code. <b>This replaces the kingdom you are playing now.</b></p>
+      <label class="btn ghost file-pick">📂 Open save file…<input type="file" id="import-file" accept=".ironcrown,.txt,.json,text/plain,application/json" hidden></label>
+      <p class="small muted" id="import-status">…or paste a code below.</p>
+      <textarea id="import-data" placeholder="IC2:H4sI…"></textarea>
+      <div class="actions">${btn('Cancel', 'close-modal', '', { cls: 'ghost' })}${btn('Import', 'import-yes', '', { id: 'import-yes' })}</div>`);
+    el('import-file').addEventListener('change', async (e) => {
+      const f = e.target.files && e.target.files[0];
+      if (!f) return;
+      el('import-status').textContent = `Reading ${f.name}…`;
+      try { el('import-data').value = await f.text(); await ACTIONS['import-yes'](); }
+      catch (err) { el('import-status').textContent = `⚠️ ${err.message || err}`; }
+    });
+  },
+  async 'import-yes'() {
+    const status = el('import-status');
+    try {
+      const d = await decodeSave(inputVal('import-data'));
+      adoptState(d); swapRealm(); save(); closeModal(); resetView(); updateHud();
+      toast(`Save imported: welcome back to ${S.name}`, 'good');
+    } catch (err) {
+      const msg = err && err.message && !/JSON|atob|decod|Invalid character|is not valid|URI|Unexpected|incorrect header|Failed to fetch/i.test(err.message) ? err.message : 'That save code or file could not be read';
+      if (status) status.textContent = '⚠️ ' + msg;
+      toast(msg, 'bad');
+    }
   },
   reset() { showModal(`<h2>Reset everything?</h2><p>Your kingdom will be lost forever.</p><div class="actions">${btn('Cancel', 'close-modal', '', { cls: 'ghost' })}${btn('Reset', 'reset-yes', '', { cls: 'red' })}</div>`); },
   'reset-yes'() { storage.del(SAVE_KEY); newGame(); swapRealm(); resetView(); showWelcome(); },
@@ -308,12 +354,17 @@ function resetView() {
 const keysDown = new Set();
 const mouse = { x: -1, y: -1, inside: false };
 function bindInput() {
+  UI.lastInput = Date.now();
+  for (const ev of ['pointerdown', 'keydown', 'wheel', 'touchstart']) window.addEventListener(ev, () => { UI.lastInput = Date.now(); }, { capture: true, passive: true });
   document.addEventListener('click', (e) => {
     const t = e.target.closest('[data-action]');
     if (t && !t.disabled && ACTIONS[t.dataset.action]) {
       // The panel refreshes about once a second while the world keeps moving, so
       // a button can outlive what it points at. Never let that wedge the click.
-      try { ACTIONS[t.dataset.action](t.dataset.arg); }
+      try {
+        const r = ACTIONS[t.dataset.action](t.dataset.arg);
+        if (r && typeof r.catch === 'function') r.catch((err) => { console.error('action ' + t.dataset.action + ':', err); toast('Something went wrong — please try again', 'bad'); });
+      }
       catch (err) { console.error('action ' + t.dataset.action + ':', err); toast('That is no longer available', 'bad'); }
       UI.panelDirty = true; renderPanel(true); updateHud();
     }

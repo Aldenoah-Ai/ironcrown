@@ -89,7 +89,7 @@ async function boot() {
   if (API.online) {
     el('sync').classList.add('online'); el('sync-label').textContent = 'synced';
     const remote = fresh ? null : await API.pull();
-    if (remote && remote.version === SAVE_VERSION && (!loaded || remote.savedAt > S.savedAt)) { S = unpackState(remote); deriveKingdom(); deriveWorld(); loaded = true; }
+    if (remote && remote.version === SAVE_VERSION && (!loaded || remote.savedAt > S.savedAt)) { adoptState(unpackState(remote)); loaded = true; }
   }
   if (loaded) catchUp(); else newGame();
   bindInput();

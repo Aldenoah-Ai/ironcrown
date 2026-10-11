@@ -1,4 +1,4 @@
-# 👑 Ironcrown `v3.5.0`
+# 👑 Ironcrown `v3.6.0`
 
 A browser kingdom-strategy game and living world simulation. Build a kingdom on a hex map, research technologies at
 universities, raise armies and navies, group them into divisions and fleets, explore ruins, caves, forts and
@@ -38,6 +38,8 @@ It's pure HTML5 Canvas + vanilla JavaScript with no build step and no dependenci
 | **Battle sim** | An animated land and naval battle simulator with real towers, cannons, catapult splash and ship broadsides. You can watch at 1×/2×/4×, skip, or auto-resolve. |
 | **Camera** | Drag or WASD/arrows to pan, scroll or pinch to zoom, a minimap, and zoom buttons. Jumps (home, minimap, focus buttons, `K`/`M`) glide rather than cut, and mouse-wheel zoom eases (instant with *reduce motion*). Settings can limit panning to drag or keys and turn on edge scrolling. |
 | **UI** | Detailed HUD with calendar, builders, research, housing, navy and power. It also has threat alerts with ETAs, rich tooltips, a 16-section help guide (`H` / `?`), settings, and a version label. Keys `1`–`9` switch panel tabs. The side panel is patched in place each second rather than rebuilt, so nothing flickers or loses its hover. |
+| **Saves you can carry** | ☰ Menu → 📤 Export downloads a `.ironcrown` save file or copies a save code, gzip-compressed to about a seventh of the raw save (~35 KB); 📥 Import opens a file or a pasted code (older uncompressed codes too) in any browser. |
+| **Fair raids** | Raids come roughly once an hour (sooner at war or with a big Main Hall). None are sent while the tab is in the background or you have been idle for 3 minutes; one that arrives while you are offline turns back, and your armies hold their ground during the catch-up. A kingdom that joins your alliance or signs a treaty calls off any army it already sent. |
 | **Loads reliably** | A loading screen until the first frame is drawn. Time away (up to 8 h) is simulated a slice per frame behind a progress banner, with the map already on screen, instead of freezing the page first. A drawing error in one layer can't blank the map (each layer is isolated and the context is reset next frame), a GPU reset rebuilds every cached image, and a slow or absent save server can't hold up start-up. |
 
 ## Project layout
@@ -66,7 +68,7 @@ public/                 ← the game; GitHub Pages serves this folder
     ui-actions.js       modals, actions, map input (drag / keys / edge / pinch / wheel)
     main.js             game loop, boot, test hooks, dev cheats
 server/server.py        optional backend (stdlib only): static files + /api/save + /api/leaderboard
-tests/e2e.mjs           Playwright headless-browser suite (64 tests + screenshots)
+tests/e2e.mjs           Playwright headless-browser suite (70 tests + screenshots)
 .github/workflows/deploy.yml   CI: run tests → deploy public/ to GitHub Pages
 deploy.sh               one-shot git init + gh repo create + Pages setup
 ```
@@ -129,6 +131,8 @@ The suite covers:
 - AI growth, cheats, persistence, the Python API, mobile layout and a clean console
 - start-up robustness: eight hours away loads the map at once and catches up behind it, a wrecked canvas recovers, a GPU reset rebuilds, a hung save server is ignored, the minimap after full exploration
 - low-poly and drag-plus-keys defaults (and the one-time move of older stored settings), number-key tabs, gliding camera, in-place panel updates
+- emoji every system can draw, compressed save files that export and import (and old codes), a server save that loads at start-up
+- raids ten times rarer and paused while you are idle, none landing while offline, allies calling off their armies
 
 ## Deploy to GitHub Pages
 

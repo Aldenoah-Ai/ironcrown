@@ -40,7 +40,7 @@ const HELP = [
     <p>Your kingdom is the land you own on the map (gold border), centred on the <b>Main Hall</b> and its cobbled plaza. Coastal buildings (Port, Shipyard) must touch the sea.</p>
     <ul>
       <li><b>Placing:</b> Build tab → choose → click a hex. Green is valid, red explains why not. Walls can be <b>painted by dragging</b>.</li>
-      <li><b>Trees & rocks</b> block some hexes. Click them and pay 🪙25 to clear them, which gives lumber or iron.</li>
+      <li><b>Trees & rocks</b> block some hexes. Click them and pay 💰25 to clear them, which gives lumber or iron.</li>
       <li><b>Upgrading:</b> click a building → Upgrade. A building's level can't exceed the Main Hall's level.</li>
       <li><b>Builders:</b> each construction or upgrade takes a builder (🔨 in the top bar). More builders come with Hall levels and the Engineering research.</li>
       <li><b>Demolish</b> refunds 40% of the cost.</li>
@@ -48,7 +48,7 @@ const HELP = [
     <table class="keys"><tr><th>Building</th><th>Unlocks at Hall</th><th>Does</th></tr>
       ${BUILD_ORDER.map((t) => `<tr><td>${BUILDINGS[t].icon} ${BUILDINGS[t].name}</td><td>${BUILDINGS[t].hall || 1}</td><td>${BUILDINGS[t].desc}</td></tr>`).join('')}</table>` },
   { id: 'resources', icon: '💰', title: 'Resources & seasons', html: `
-    <p>There are five resources: 🪙 Gold, ⛓️ Iron, 💎 Diamonds, 🪵 Lumber and 🌾 Food. They flow in automatically from mines, mills, farms, the Main Hall (taxes), Ports (trade) and the <b>land you hold on the World map</b>.</p>
+    <p>There are five resources: 💰 Gold, ⛓️ Iron, 💎 Diamonds, 🌳 Lumber and 🌾 Food. They flow in automatically from mines, mills, farms, the Main Hall (taxes), Ports (trade) and the <b>land you hold on the World map</b>.</p>
     <ul>
       <li><b>Storage</b> is capped by the Main Hall. Warehouses and the Banking research raise it. A full bar turns gold.</li>
       <li><b>Upkeep:</b> every soldier eats food, and every ship costs a little gold. If your food runs out while income is negative, <b>soldiers desert</b> (1% every 10 seconds) until you fix it.</li>
@@ -85,7 +85,7 @@ const HELP = [
       <li>You can <b>own several copies</b> of the same general. Each copy can lead a different division.</li>
       <li><b>Promote:</b> merge an idle spare copy into a general for +★ (+10% stats each, max 5★).</li>
       <li>Swap commanders from the division card (General dropdown) or the Generals tab.</li>
-      <li>Get generals from the <b>🍺 Tavern</b> in the Shop (🪙900), <b>Mystery Boxes</b>, <b>ruins</b> and destroyed <b>pirate coves</b>.</li>
+      <li>Get generals from the <b>🍺 Tavern</b> in the Shop (💰900), <b>Mystery Boxes</b>, <b>ruins</b> and destroyed <b>pirate coves</b>.</li>
     </ul>
     <h4>Items</h4><ul>${Object.values(ITEMS).map((i) => `<li>${i.icon} <b>${i.name}</b>: ${i.desc}</li>`).join('')}</ul>` },
   { id: 'navy', icon: '⚓', title: 'Navy & fleets', html: `
@@ -114,7 +114,7 @@ const HELP = [
     <p>The whole world is one map of small hexes. <b>You can build anywhere:</b> on any hex you own, or on any explored unclaimed land, which settles that hex for a small fee. There is <b>no limit</b> on how many of each building you have. The Main Hall only decides which building types are unlocked and how high they can be upgraded. Click an empty hex and pick from <b>Build here</b>, or choose a building in the 🏗️ Build tab and click a hex.</p>
     <ul>
       <li><b>Terrain matters:</b> Lumber Mills produce more in forests, Gold and Iron Mines on hills (and a lot more on a gold vein), Diamond Mines on a gem cave, and Farms on plains or meadows.</li>
-      <li>Forests have trees and hills have rocks. Clear them (🪙25, which pays back in lumber or iron) before building, unless the building uses them: lumber mills go straight into forests and mines onto rocky hills.</li>
+      <li>Forests have trees and hills have rocks. Clear them (💰25, which pays back in lumber or iron) before building, unless the building uses them: lumber mills go straight into forests and mines onto rocky hills.</li>
       <li>Towers, Cannons, Spires and <b>Fortresses</b> fight in every battle within 3 hexes, and they <b>open fire on any hostile army that marches past</b> within range. Each one fights <b>as itself, on its own hex</b>: an Archer Tower looses arrows, a Cannon lobs iron, a Fortress mans two turrets, a Spire throws arcane bolts.</li>
       <li><b>Raiders pick soft targets:</b> buildings with no tower, cannon, spire, fortress or wall nearby are about 4× more likely to be attacked. The Build here panel warns you about unprotected spots.</li>
       <li>Ports and Shipyards need a coastal hex. Fleets can dock at any of your ports.</li>
@@ -133,7 +133,7 @@ const HELP = [
       <li><b>You only ever command your own troops.</b> Allied kingdoms fighting beside you run themselves, and a war between an ally and someone else is never handed to you — it is resolved without you unless forces of yours are on that field.</li>
       <li>After a battle, the forces that fought rest for 30 seconds, and beaten armies fall back home. Fights don't chain endlessly.</li>
       <li><b>Counters:</b> Pikemen crush cavalry, Horsemen ride down archers and catapults, Archers shred pikemen, Swordsmen beat archers up close, and Catapults smash towers.</li>
-      <li><b>Raids:</b> hostile kingdoms send armies at your <b>weakest land</b>, usually undefended outlying hexes and sometimes the capital. A red ⚠ alert shows the target and ETA, and the target hex pulses red. Intercept the army, station a division on the target, or build a watchtower or fortress. Undefended targets are pillaged without a fight.</li>
+      <li><b>Raids:</b> hostile kingdoms send armies at your <b>weakest land</b>, usually undefended outlying hexes and sometimes the capital. A red ⚠ alert shows the target and ETA, and the target hex pulses red. Intercept the army, station a division on the target, or build a watchtower or fortress. Undefended targets are pillaged without a fight. Raids come roughly once an hour (more often at war or with a big Main Hall), and <b>never while you are away</b>: none are sent while the game is in the background or you have not touched it for 3 minutes, and a raid that arrives while you are offline turns back. While the game catches up on time you were offline, your armies hold their ground instead of fighting.
       <li><b>Fortifications are formidable.</b> Towers, Cannons, Fortresses and Spires hit and endure about <b>fourteen times</b> harder than they once did — a defended town is a serious undertaking for any army, yours or theirs. Bring <b>Catapults</b> (×10 against stonework), Cannons or Spires if you mean to take one.</li>
       <li><b>Nobody is moved into position.</b> A battle forms up exactly where each force is standing: your division fights from its own hex, the enemy from theirs, the towers from theirs. Soldiers keep their feet on land and ships stay on the water — no one is ever shoved into the sea to make room for a battle line.</li>
       <li><b>Battles are fought on the real landscape.</b> Nothing is faked for the fight: the towers on the field are the buildings that actually stand there, on their real hexes, with their real type and level. Build more of them and more of them fight. <b>Towers shoot at towers too</b> — Cannons and Arcane Spires would rather knock the enemy's stonework down than chase infantry. Walls stiffen your towers; Masonry and Fortification research help too.</li>
@@ -154,8 +154,8 @@ const HELP = [
     <p>Relation ranges from −100 (enemy) to +100 (friendly). Kingdoms below −35 or at war are hostile on the map.</p>` },
   { id: 'alliances', icon: '🤝', title: 'Alliances', html: `
     <ul>
-      <li>Join one of the AI alliances (some are invite-only and may decline), or <b>found your own</b> for 🪙1000.</li>
-      <li>Alliances give shared bonuses to production, attack, defense and training speed. Allies never raid you and they <b>reinforce your capital</b> in raids.</li>
+      <li>Join one of the AI alliances (some are invite-only and may decline), or <b>found your own</b> for 💰1000.</li>
+      <li>Alliances give shared bonuses to production, attack, defense and training speed. Allies never raid you and they <b>reinforce your capital</b> in raids. A kingdom that joins your alliance, or signs a treaty, calls off any army it already sent.</li>
       <li>Donate resources to level the alliance up (max 10). As leader you can invite or kick kingdoms and toggle open recruitment.</li>
       <li>Alliance chat is where your allies gossip and react to you.</li>
     </ul>` },
@@ -176,7 +176,7 @@ const HELP = [
   { id: 'saves', icon: '💾', title: 'Saving, settings & version', html: `
     <ul>
       <li>The game autosaves to this browser every 15 seconds and when you leave. If the optional Python server is running, it also syncs to the cloud and shows a global leaderboard.</li>
-      <li>☰ Menu → Export/Import moves a save between browsers, and Reset starts over.</li>
+      <li>☰ Menu → 📤 Export downloads a small save file (or copies a compressed save code); 📥 Import opens one in any browser. Reset starts over.</li>
       <li>⚙️ Settings holds the camera mode, zoom speed, edge scrolling, grid lines, particles, minimap and battle mode.</li>
       <li>The version number appears in the bottom-left corner of the map and in the menu.</li>
       <li><b>Developer cheats:</b> open the browser console (F12) and type <code>cheats.help()</code>.</li>

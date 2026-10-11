@@ -106,7 +106,7 @@ function promoteGeneral(uid) {
 }
 const HIRE_COST = { gold: 900 };
 function hireGeneral() {
-  if (!pay(HIRE_COST)) { toast('Hiring a general costs 🪙900', 'bad'); return null; }
+  if (!pay(HIRE_COST)) { toast('Hiring a general costs 💰900', 'bad'); return null; }
   const g = pick(GENERALS.filter((x) => x.rarity === (Math.random() < 0.15 ? 'rare' : 'common')));
   grantGeneral(g.id);
   log(`Hired ${g.name} at the tavern.`, 'good');

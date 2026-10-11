@@ -549,6 +549,7 @@ const aiFleetHostile = (f) => f.owner === 'pirate' || hostileToPlayer(S.kingdoms
 const aiSpeed = (a) => Math.min(...COMBAT_UNITS.filter((u) => a.units[u] > 0).map((u) => UNITS[u].speed), 1.2);
 
 function stepAiArmies(dt, offline) {
+  callOffFriendlyRaids();
   for (const a of [...S.aiArmies]) {
     if (a.status === 'fighting') continue;
     const k = S.kingdoms[a.kid];
@@ -595,21 +596,21 @@ function stepAiFleets(dt) {
       f.path = findPath(WG, f.at, goal, fleetCost, 30000) || [];
     }
     advance(f, dt, Math.min(...SHIP_TYPES.filter((t) => f.ships[t] > 0).map((t) => SHIPS[t].speed), 1.6) * 0.8, fleetCost, HEX_TIME_SEA);
-    if (f.owner === 'pirate' && f.at === S.world.harbor) piratesAtHarbor(f);
+    if (f.owner === 'pirate' && f.at === S.world.harbor) { if (catchingUp()) S.aiFleets = S.aiFleets.filter((x) => x !== f); else piratesAtHarbor(f); }
   }
 }
 function piratesAtHarbor(p) {
   if (shipCount(S.harbor) > 0 && S.started) {
     gatherBattle(S.world.harbor, ['P', 'X'], { kind: 'naval', title: '🏴‍☠️ Pirates attack your harbour!', holder: 'P',
       onEnd: (r, lost) => {
-        if (r.win) { gain({ gold: 300 }); report('🏴‍☠️ Your harbour guard sank the pirates! +🪙300 bounty.', 'good', lost); }
+        if (r.win) { gain({ gold: 300 }); report('🏴‍☠️ Your harbour guard sank the pirates! +💰300 bounty.', 'good', lost); }
         else { S.pirateBlockade = 180; report('🏴‍☠️ Pirates overwhelmed the harbour and blockade your port for 3 minutes.', 'bad', lost); }
       } });
   } else {
     const stolen = Math.floor(S.res.gold * 0.08);
     S.res.gold -= stolen; S.pirateBlockade = 180;
     S.aiFleets = S.aiFleets.filter((x) => x !== p);
-    report(`🏴‍☠️ Pirates raided your undefended harbour, stole 🪙${fmt(stolen)} and blockade your port for 3 minutes. Build warships!`, 'bad');
+    report(`🏴‍☠️ Pirates raided your undefended harbour, stole 💰${fmt(stolen)} and blockade your port for 3 minutes. Build warships!`, 'bad');
   }
 }
 
@@ -630,9 +631,25 @@ function mainlandSet() {
 }
 function canReachCapital(k) { return !!mainlandSet()[k.capital]; }
 function raidCandidates() {
-  return S.kingdoms.filter((k) => !(S.allianceId && k.allianceId === S.allianceId) && k.treaty <= 0 && (k.atWar || k.relation < 0 || k.personality === 'aggressive'));
+  return S.kingdoms.filter((k) => !friendlyToPlayer(k) && (k.atWar || k.relation < 0 || k.personality === 'aggressive'));
 }
-function scheduleRaid() { S.raidTimer = rand(280, 500) / (1 + 0.08 * hallLevel()) * (S.kingdoms.some((k) => k.atWar) ? 0.6 : 1); }
+// Raids came every five to eight minutes, which left no time to play anything
+// else. Now it is closer to once an hour (sooner with a big Main Hall or a war).
+function scheduleRaid() { S.raidTimer = rand(2800, 5000) / (1 + 0.08 * hallLevel()) * (S.kingdoms.some((k) => k.atWar) ? 0.6 : 1); }
+// A kingdom you are allied with, or have a treaty with, does not attack you.
+const friendlyToPlayer = (k) => !!k && ((S.allianceId && k.allianceId === S.allianceId) || k.treaty > 0);
+// Armies already marching on you turn back the moment their kingdom becomes a
+// friend — joining your alliance used to leave the raid coming anyway.
+function callOffFriendlyRaids() {
+  for (const a of S.aiArmies) {
+    if (a.kind !== 'raid' || a.status === 'fighting') continue;
+    const k = S.kingdoms[a.kid];
+    if (!friendlyToPlayer(k)) continue;
+    a.kind = 'home'; a.targetHex = null;
+    a.path = findPath(WG, a.at, k.capital, aiLandCost) || []; a.status = a.path.length ? 'moving' : 'idle';
+    log(`🤝 ${k.name} called off the army it had sent against you.`, 'good');
+  }
+}
 function raidTargets(k) {
   const out = {};
   const reach = Math.round(80 * MAP_SCALE);
@@ -684,6 +701,13 @@ function raidersHome(a, k, units) {
 function resolveRaid(a, offline) {
   const k = S.kingdoms[a.kid], hex = a.targetHex ?? S.world.capital, capital = hex === S.world.capital, T = teamOfKingdom(k);
   if (S.world.owner[hex] !== -2) { raidersHome(a, k, a.units); S.aiArmies = S.aiArmies.filter((x) => x !== a); return; }
+  // Nobody comes home to find their realm sacked: a raid that arrives while the
+  // game is catching up on time you were away finds the gates shut and leaves.
+  if (catchingUp()) {
+    log(`🛡️ While you were away, ${k.name}'s army reached ${capital ? 'your capital' : hexName(hex)}, found the gates barred and marched home.`, 'info');
+    S.aiArmies = S.aiArmies.filter((x) => x !== a); raidersHome(a, k, a.units);
+    return;
+  }
   const pillage = (why) => {
     const stolen = {};
     const f = capital ? 1 : 0.35;
@@ -714,7 +738,7 @@ function resolveRaid(a, offline) {
       if (r.win) {
         const loot = { gold: Math.round(k.res.gold * 0.05 + 100) };
         k.res.gold -= loot.gold; gain(loot); S.stats.raidsRepelled++;
-        report(`🛡️ ${k.name}'s raid on ${capital ? 'your capital' : hexName(hex)} was repelled! +🪙${fmt(loot.gold)}.`, 'good', lost);
+        report(`🛡️ ${k.name}'s raid on ${capital ? 'your capital' : hexName(hex)} was repelled! +💰${fmt(loot.gold)}.`, 'good', lost);
       } else pillage(`broke through at ${capital ? 'your capital' : hexName(hex)}`);
       if (me) { S.aiArmies = S.aiArmies.filter((x) => x !== me); raidersHome(me, k, me.units); }
     } });
@@ -727,7 +751,7 @@ const DIPLO = {
   treaty(k) {
     if (k.atWar) return toast('Make peace first', 'bad');
     if (k.relation < 10) return toast(`${k.ruler} does not trust you enough (relation 10+)`, 'bad');
-    if (!pay({ gold: 400 })) return toast('A treaty costs 🪙400', 'bad');
+    if (!pay({ gold: 400 })) return toast('A treaty costs 💰400', 'bad');
     k.treaty = 1200; k.relation += 5; log(`Non-aggression treaty signed with ${k.name} (20 min).`, 'good'); toast(`🕊️ Treaty signed with ${k.name}`, 'good');
   },
   pact(k) {
@@ -738,7 +762,7 @@ const DIPLO = {
   tribute(k) {
     if (totalPower() > 1.4 * (k.power + k.defense)) {
       const g = Math.floor(k.res.gold * 0.2); k.res.gold -= g; gain({ gold: g }); k.relation -= 20;
-      log(`${k.name} paid you 🪙${fmt(g)} in tribute.`, 'good'); toast(`${k.ruler} grudgingly pays 🪙${fmt(g)}`, 'good');
+      log(`${k.name} paid you 💰${fmt(g)} in tribute.`, 'good'); toast(`${k.ruler} grudgingly pays 💰${fmt(g)}`, 'good');
     } else { k.relation -= 10; toast(`${k.ruler} laughs at your demand`, 'bad'); if (k.personality === 'aggressive' && Math.random() < 0.4) DIPLO.war(k, true); }
   },
   war(k, theyDeclared) {
@@ -748,7 +772,7 @@ const DIPLO = {
   },
   peace(k) {
     const cost = { gold: 400 * k.hall };
-    if (!pay(cost)) return toast(`Peace costs 🪙${cost.gold}`, 'bad');
+    if (!pay(cost)) return toast(`Peace costs 💰${cost.gold}`, 'bad');
     k.atWar = false; k.relation = -20; log(`Peace made with ${k.name}.`, 'good'); toast(`🕊️ Peace with ${k.name}`, 'good');
   },
 };
@@ -810,12 +834,15 @@ function checkEncounters(offline) {
   // An army with nobody left in it is not an army; it should not be drawn, and
   // it should certainly not keep being dragged towards fights it cannot join.
   if (S.aiArmies.some((a) => !armyHousing(a.units))) S.aiArmies = S.aiArmies.filter((a) => armyHousing(a.units) > 0 || a.status === 'fighting');
-  const land = S.divisions.filter((d) => d.status !== 'fighting' && armyHousing(d.units) > 0 && !onCooldown(d)).map((d) => ({ team: 'P', e: d, zone: !d.path.length }))
+  // While catching up on time you were away, your armies hold their ground
+  // rather than fight battle after battle with nobody there to command them.
+  const away = catchingUp();
+  const land = S.divisions.filter((d) => !away && d.status !== 'fighting' && armyHousing(d.units) > 0 && !onCooldown(d)).map((d) => ({ team: 'P', e: d, zone: !d.path.length }))
     .concat(S.aiArmies.filter((a) => a.status !== 'fighting' && a.kind !== 'home' && armyHousing(a.units) > 0 && !onCooldown(a)).map((a) => ({ team: teamOfKingdom(S.kingdoms[a.kid]), e: a, zone: a.kind === 'guard' && !a.path.length, raid: a.kind === 'raid' })));
   // your towers, cannons, spires and fortresses open fire on hostile armies passing within range
   for (const L of land) {
     if (L.team === 'P' || L.e.status === 'fighting' || !(L.raid || teamsHostile(L.team, 'P')) || !(L.e.path.length || L.raid)) continue;
-    if (distToTerritory(L.e.at) > 4) continue;            // nowhere near your walls; do not scan every building
+    if (away || distToTerritory(L.e.at) > 4) continue;    // nowhere near your walls; do not scan every building
     if (playerTowers(L.e.at).length) fieldBattle(L.e.at, 'P', L.team, `🗼 Your defenses open fire on the ${teamInfo(L.team).name} army`, offline);
   }
   /* Two hundred armies means twenty thousand pairs if you compare them all, sixty
@@ -844,7 +871,7 @@ function checkEncounters(offline) {
       }
     }
   }
-  const sea = S.fleets.filter((f) => f.status !== 'fighting' && !onCooldown(f)).map((f) => ({ team: 'P', e: f }))
+  const sea = S.fleets.filter((f) => !away && f.status !== 'fighting' && !onCooldown(f)).map((f) => ({ team: 'P', e: f }))
     .concat(S.aiFleets.filter((f) => f.status !== 'fighting' && !onCooldown(f)).map((f) => ({ team: f.owner === 'pirate' ? 'X' : teamOfKingdom(S.kingdoms[f.owner]), e: f })));
   for (let i = 0; i < sea.length; i++) for (let j = i + 1; j < sea.length; j++) {
     const A = sea[i], B = sea[j];
@@ -854,7 +881,7 @@ function checkEncounters(offline) {
     gatherBattle(B.e.at, [A.team, B.team], { kind: 'naval', offline, title: pl ? `⚓ ${pl.e.name} engages the ${teamInfo(pl === A ? B.team : A.team).name}` : `⚓ ${teamInfo(A.team).name} and ${teamInfo(B.team).name} clash at sea`,
       onEnd: (r, lost) => {
         if (!r.teams.P) return;
-        if (r.win) { gain({ gold: 200 }); report('⚓ Victory at sea! +🪙200.', 'good', lost); }
+        if (r.win) { gain({ gold: 200 }); report('⚓ Victory at sea! +💰200.', 'good', lost); }
         else { report('⚓ Your fleet lost the sea battle.', 'bad', lost); }
       } });
   }
@@ -928,11 +955,11 @@ function step(dt, offline = false) {
   stepAiFleets(dt);
   checkEncounters(offline);
   S.guardTimer = (S.guardTimer || 0) - dt;
-  if (S.guardTimer <= 0) { S.guardTimer = GUARD_TICK; guardDuty(offline); }
+  if (S.guardTimer <= 0) { S.guardTimer = GUARD_TICK; if (!catchingUp()) guardDuty(offline); }
 
   S.aiTimer -= dt;
   while (S.aiTimer <= 0) { aiTurn(offline); S.aiTimer += AI_TICK; }
-  if (!offline && S.started) {
+  if (!offline && S.started && !playerIdle()) {      // no new raids or pirates while you are not at the screen
     S.raidTimer -= dt;
     if (S.raidTimer <= 0) {
       scheduleRaid();

@@ -70,7 +70,7 @@ function newGame(name) {
     world: null, kingdoms: [], aiArmies: [], aiFleets: [], missions: [], intel: {},
     alliances: [], allianceId: null,
     log: [], stats: { battlesWon: 0, battlesLost: 0, navalWon: 0, navalLost: 0, raidsRepelled: 0, raidsLost: 0, boxesOpened: 0, scouted: 0, ruinsExplored: 0, wrecksSalvaged: 0, researched: 0 },
-    aiTimer: AI_TICK, raidTimer: 540, pirateTimer: 420,
+    aiTimer: AI_TICK, raidTimer: 1200, pirateTimer: 420,
   };
   generateWorld();
   addBuilding('hall', S.world.capital, 1);
@@ -122,6 +122,45 @@ function unpackState(st) {
 }
 const serialize = (st) => JSON.stringify(packState(st));
 
+/* ---- Save codes and files (export / import) ----
+   A save is ~260 KB of JSON; as plain base64 that was a 350 KB code — about a
+   hundred pages pasted into a document. Gzipped first it is ~40 KB. Codes are
+   "IC2:" + base64(gzip(json)); older plain-base64 codes and raw JSON still import. */
+const SAVE_CODE_PREFIX = 'IC2:';
+function bytesToB64(bytes) {
+  let bin = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+  return btoa(bin);
+}
+function b64ToBytes(b64) {
+  const bin = atob(b64), out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+const canGzip = () => typeof CompressionStream === 'function' && typeof DecompressionStream === 'function';
+async function encodeSave(st) {
+  const json = serialize(st);
+  if (!canGzip()) return btoa(unescape(encodeURIComponent(json)));
+  const buf = await new Response(new Blob([json]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer();
+  return SAVE_CODE_PREFIX + bytesToB64(new Uint8Array(buf));
+}
+async function decodeSave(text) {
+  text = String(text || '').trim();
+  let json;
+  if (text.startsWith('{')) json = text;                                     // a raw JSON save file
+  else {
+    const code = text.replace(/\s+/g, '');                                   // pasted codes may have been wrapped onto many lines
+    if (code.startsWith(SAVE_CODE_PREFIX)) {
+      if (!canGzip()) throw new Error('This browser is too old to open compressed saves');
+      json = await new Response(new Blob([b64ToBytes(code.slice(SAVE_CODE_PREFIX.length))]).stream().pipeThrough(new DecompressionStream('gzip'))).text();
+    } else json = decodeURIComponent(escape(atob(code)));                    // a v3.5-or-earlier code
+  }
+  const d = unpackState(JSON.parse(json));
+  if (!d || !d.world || !d.version) throw new Error('That is not an Ironcrown save');
+  if (d.version !== SAVE_VERSION) throw new Error(`That save is from an older Ironcrown (save format ${d.version}) and cannot be loaded here`);
+  return d;
+}
+
 function save() {
   if (!S) return false;
   S.savedAt = Date.now() - CATCHUP.left * 1000;   // time not yet simulated stays owed
@@ -140,9 +179,7 @@ function load() {
       if (data && data.version) UI.oldSave = data.version;
       return false;
     }
-    S = data;
-    deriveWorld();
-    migrate();
+    adoptState(data);
     return true;
   } catch (e) {
     // A save we cannot read is worth saying out loud rather than silently
@@ -153,6 +190,13 @@ function load() {
   }
 }
 
+// Make a loaded save the running game: derive the world caches, bring old fields
+// up to date. If that fails, the game that was running stays as it was.
+function adoptState(data) {
+  const prev = S;
+  try { S = data; deriveWorld(); migrate(); }
+  catch (e) { S = prev; if (prev) deriveWorld(); throw e; }
+}
 // Bring older v2 saves up to date (v2.0 → v2.1).
 function migrate() {
   S.scouts = S.scouts || [];
@@ -245,6 +289,15 @@ function runCatchUp(budgetMs) {
   return false;
 }
 function finishCatchUp() { while (runCatchUp(1e9)); }
+// True while the game is simulating time you were not here for.
+const catchingUp = () => CATCHUP.left > 0;
+/* Away from the screen with the game still open — another window on top, gone
+   for a coffee. No new raids or pirates are sent while nobody is watching. */
+const IDLE_AFTER = 180e3;
+function playerIdle() {
+  if (typeof document !== 'undefined' && document.hidden) return true;
+  return Date.now() - (UI.lastInput || Date.now()) > IDLE_AFTER;
+}
 
 /* ---- Optional Python backend (server/server.py). Absent on GitHub Pages. ---- */
 const API = {

@@ -5,7 +5,7 @@
    ========================================================================== */
 'use strict';
 
-const GAME_VERSION = '3.5.0';
+const GAME_VERSION = '3.6.0';
 const SAVE_VERSION = 4;
 
 // ONE map made of small hexes (pointy-top, odd-r offset). Cities, land, sea,
@@ -29,10 +29,10 @@ const OFFLINE_CAP = 8 * 3600;
 
 const RES = ['gold', 'iron', 'diamonds', 'lumber', 'food'];
 const RES_META = {
-  gold:     { name: 'Gold',     icon: '🪙', color: '#f2c14e' },
+  gold:     { name: 'Gold',     icon: '💰', color: '#f2c14e' },
   iron:     { name: 'Iron',     icon: '⛓️', color: '#9fb3c8' },
   diamonds: { name: 'Diamonds', icon: '💎', color: '#6fe3f2' },
-  lumber:   { name: 'Lumber',   icon: '🪵', color: '#c8894a' },
+  lumber:   { name: 'Lumber',   icon: '🌳', color: '#c8894a' },
   food:     { name: 'Food',     icon: '🌾', color: '#9bd46a' },
 };
 
@@ -48,13 +48,13 @@ const SEASONS = [
 const BUILDINGS = {
   hall:        { name: 'Main Hall', icon: '🏰', cat: 'core', base: { gold: 450, lumber: 450, iron: 180 }, mult: 2.3, time: 14, limit: [1,1,1,1,1,1],
                  desc: 'Heart of the kingdom. Each level expands your hexagonal land, raises storage, adds builders and unlocks new buildings and levels.' },
-  goldmine:    { name: 'Gold Mine', icon: '🪙', cat: 'resource', produces: 'gold', rate: 1.1, base: { lumber: 80, food: 20 }, mult: 1.75, time: 4, limit: [2,3,4,5,6,6],
+  goldmine:    { name: 'Gold Mine', icon: '💰', cat: 'resource', produces: 'gold', rate: 1.1, base: { lumber: 80, food: 20 }, mult: 1.75, time: 4, limit: [2,3,4,5,6,6],
                  desc: 'Digs gold coins out of the hills.' },
   ironmine:    { name: 'Iron Mine', icon: '⛏️', cat: 'resource', produces: 'iron', rate: 0.6, base: { gold: 100, lumber: 90 }, mult: 1.75, time: 5, limit: [1,2,3,4,5,5],
                  desc: 'Iron for weapons, armour, cannons and ship fittings.' },
   diamondmine: { name: 'Diamond Mine', icon: '💎', cat: 'resource', produces: 'diamonds', rate: 0.04, base: { gold: 700, iron: 250, lumber: 250 }, mult: 1.9, time: 10, hall: 3, limit: [0,0,1,2,3,3],
                  desc: 'Rare gems — spend them on Royal Reliquaries, galleons and Arcane Spires.' },
-  lumbermill:  { name: 'Lumber Mill', icon: '🪵', cat: 'resource', produces: 'lumber', rate: 1.0, base: { gold: 80 }, mult: 1.75, time: 4, limit: [2,3,4,5,6,6],
+  lumbermill:  { name: 'Lumber Mill', icon: '🌳', cat: 'resource', produces: 'lumber', rate: 1.0, base: { gold: 80 }, mult: 1.75, time: 4, limit: [2,3,4,5,6,6],
                  desc: 'Saws timber for buildings and ships.' },
   farm:        { name: 'Farm', icon: '🌾', cat: 'resource', produces: 'food', rate: 1.3, base: { gold: 60, lumber: 40 }, mult: 1.75, time: 4, limit: [2,3,4,5,6,6],
                  desc: 'Feeds your people and your soldiers. Harvests change with the seasons.' },
@@ -134,7 +134,7 @@ const GENERALS = [
   { id: 'hale',     name: 'Captain Hale',         icon: '🧑‍✈️', rarity: 'common',    atk: 30, hp: 32, spd: 36, spec: 'fleet', lore: 'Knows every reef between here and the edge of the map.' },
   { id: 'seraph',   name: 'Lady Seraphine',       icon: '👸', rarity: 'rare',      atk: 44, hp: 52, spd: 38, lore: 'A tactician whose banners never fall.' },
   { id: 'kael',     name: 'Kael Stormrider',      icon: '🏇', rarity: 'rare',      atk: 50, hp: 36, spd: 66, spec: 'horseman', lore: 'Rides ahead of the thunder.' },
-  { id: 'gorran',   name: 'Gorran the Bold',      icon: '🧌', rarity: 'rare',      atk: 58, hp: 50, spd: 28, spec: 'swordsman', lore: 'Bold is an understatement.' },
+  { id: 'gorran',   name: 'Gorran the Bold',      icon: '👹', rarity: 'rare',      atk: 58, hp: 50, spd: 28, spec: 'swordsman', lore: 'Bold is an understatement.' },
   { id: 'corvina',  name: 'Admiral Corvina',      icon: '🦜', rarity: 'rare',      atk: 52, hp: 48, spd: 58, spec: 'fleet', lore: 'Her fleets arrive with the tide — and leave with your gold.' },
   { id: 'valeria',  name: 'Valeria Nightshade',   icon: '🧝‍♀️', rarity: 'epic',      atk: 72, hp: 54, spd: 70, spec: 'archer', lore: 'Her arrows arrive before the sound of the bowstring.' },
   { id: 'thorne',   name: 'Thorne Blackwood',     icon: '🧙', rarity: 'epic',      atk: 66, hp: 74, spd: 46, spec: 'catapult', lore: 'Warlord of the deep forests and master of siegecraft.' },
@@ -187,7 +187,7 @@ const FEATURES = {
 };
 const MINERALS = {
   iron:  { name: 'Iron ore',   bonus: { iron: 0.9 },      icon: '⛓️' },
-  gold:  { name: 'Gold ore',   bonus: { gold: 1.0 },      icon: '🪙' },
+  gold:  { name: 'Gold ore',   bonus: { gold: 1.0 },      icon: '💰' },
   gems:  { name: 'Gemstones',  bonus: { diamonds: 0.05 }, icon: '💎' },
 };
 
@@ -209,10 +209,10 @@ const RESEARCH = {
   logistics:    { cat: 'military', name: 'Logistics',          icon: '🧭', max: 3, uni: 2, base: { gold: 700, food: 600 },              time: 60, req: ['drill'], desc: (l) => `+${12 * l}% division march speed` },
   medicine:     { cat: 'military', name: 'Field Medicine',     icon: '⚕️', max: 3, uni: 2, base: { gold: 800, food: 500 },              time: 60, req: ['armor'], desc: (l) => `Recover ${10 * l}% of battle casualties` },
   siege:        { cat: 'military', name: 'Siege Engineering',  icon: '☄️', max: 3, uni: 3, base: { gold: 1400, lumber: 1000, iron: 600 }, time: 90, req: ['weapons'], hall: 3, desc: (l) => (l === 1 ? 'Unlocks Catapults' : `+${15 * (l - 1)}% catapult attack`) },
-  shipwright:   { cat: 'naval',    name: 'Shipwrighting',      icon: '🪚', max: 3, uni: 1, base: { gold: 500, lumber: 600 },            time: 45, desc: (l) => `-${10 * l}% ship cost, -${15 * l}% build time` },
+  shipwright:   { cat: 'naval',    name: 'Shipwrighting',      icon: '⚒️', max: 3, uni: 1, base: { gold: 500, lumber: 600 },            time: 45, desc: (l) => `-${10 * l}% ship cost, -${15 * l}% build time` },
   navigation:   { cat: 'naval',    name: 'Navigation',         icon: '🧭', max: 3, uni: 1, base: { gold: 500, lumber: 400 },            time: 45, desc: (l) => `+${12 * l}% fleet speed` },
   sails:        { cat: 'naval',    name: 'Lateen Sails',       icon: '⛵', max: 3, uni: 2, base: { gold: 800, lumber: 700 },            time: 60, req: ['navigation'], desc: (l) => `+${10 * l}% more fleet speed` },
-  hulls:        { cat: 'naval',    name: 'Reinforced Hulls',   icon: '🪵', max: 3, uni: 2, base: { gold: 800, lumber: 600, iron: 300 },  time: 60, req: ['shipwright'], desc: (l) => `+${12 * l}% ship health` },
+  hulls:        { cat: 'naval',    name: 'Reinforced Hulls',   icon: '🌳', max: 3, uni: 2, base: { gold: 800, lumber: 600, iron: 300 },  time: 60, req: ['shipwright'], desc: (l) => `+${12 * l}% ship health` },
   cannons:      { cat: 'naval',    name: 'Naval Cannons',      icon: '💥', max: 3, uni: 3, base: { gold: 1200, iron: 800 },             time: 80, req: ['hulls'], desc: (l) => `+${12 * l}% ship attack` },
   cartography:  { cat: 'naval',    name: 'Cartography',        icon: '🗺️', max: 2, uni: 2, base: { gold: 700, lumber: 300 },            time: 60, req: ['navigation'], desc: (l) => `+${l} vision range for fleets, divisions & scouts` },
   masonry:      { cat: 'civic',    name: 'Masonry',            icon: '🧱', max: 3, uni: 1, base: { gold: 300, iron: 150 },              time: 35, desc: (l) => `+${10 * l}% defense rating` },

@@ -1,6 +1,6 @@
 {
   "name": "ironcrown",
-  "version": "3.5.0",
+  "version": "3.6.0",
   "description": "Ironcrown: a browser kingdom-strategy game (hex world, HTML5 Canvas + vanilla JS, optional Python save server)",
   "private": true,
   "type": "module",

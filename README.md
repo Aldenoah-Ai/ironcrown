@@ -1,4 +1,4 @@
-# 👑 Ironcrown `v3.6.0`
+# 👑 Ironcrown `v3.6.1`
 
 A browser kingdom-strategy game and living world simulation. Build a kingdom on a hex map, research technologies at
 universities, raise armies and navies, group them into divisions and fleets, explore ruins, caves, forts and

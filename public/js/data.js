@@ -5,7 +5,7 @@
    ========================================================================== */
 'use strict';
 
-const GAME_VERSION = '3.6.0';
+const GAME_VERSION = '3.6.1';
 const SAVE_VERSION = 4;
 
 // ONE map made of small hexes (pointy-top, odd-r offset). Cities, land, sea,

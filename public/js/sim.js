@@ -232,7 +232,10 @@ const battleNear = (hex) => Battles.list.some((b) => !b.done && WG.dist(b.cfg.he
 function gatherBattle(hex, core, opts) {
   if (hex == null || hex < 0 || hex >= WG.N || battleNear(hex)) return null;                     // one battlefield per area at a time
   const naval = opts.kind === 'naval';
-  const pool = (naval ? navalForcesNear(hex) : landForcesNear(hex)).filter((f) => !onCooldown(f.ref)).concat(opts.extra || []);
+  // While the game catches up on time you were away, nobody else's battle drags
+  // your forces in: a war between two kingdoms next to your army used to.
+  const keepOut = catchingUp() && !core.includes('P');
+  const pool = (naval ? navalForcesNear(hex) : landForcesNear(hex)).filter((f) => !onCooldown(f.ref) && !(keepOut && f.team === 'P')).concat(opts.extra || []);
   const inTeams = new Set(core);
   let grew = true;
   while (grew) {

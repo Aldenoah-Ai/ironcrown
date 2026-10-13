@@ -142,7 +142,7 @@ function drawCityLayer(g, t, dt, vis, inView) {
     g.fill();
   };
   plaza(cap);
-  for (const k of S.kingdoms) if (isSeen(k.capital)) plaza(k.capital);
+  for (const k of S.kingdoms) if (!k.fallen && isSeen(k.capital)) plaza(k.capital);
   // cleared hexes & loose rocks on your land (walk your own hexes, not the screen)
   if (detail) for (const i of playerLand()) {
     if (!inView(i)) continue;
@@ -165,7 +165,7 @@ function drawCityLayer(g, t, dt, vis, inView) {
   const fighting = Battles.list.length ? Battles.towerHexes() : null;   // those are drawn by the battle instead
   const shown = (b) => inView(b.hex) && !(fighting && fighting.has(b.hex) && DEF_TYPES.includes(b.type));
   const list = S.buildings.filter(shown);
-  for (const k of S.kingdoms) if (isSeen(k.capital)) for (const b of aiCity(k).buildings) if (shown(b)) list.push(b);
+  for (const k of S.kingdoms) if (!k.fallen && isSeen(k.capital)) for (const b of aiCity(k).buildings) if (shown(b)) list.push(b);
   list.sort((a, b) => WG.cy[a.hex] - WG.cy[b.hex]);
   if (detail) {
     /* Live art is what makes windmills turn and forges smoke; it is also the most

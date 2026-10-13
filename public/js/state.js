@@ -194,7 +194,7 @@ function load() {
 // up to date. If that fails, the game that was running stays as it was.
 function adoptState(data) {
   const prev = S;
-  try { S = data; deriveWorld(); migrate(); }
+  try { S = unpackState(data); deriveWorld(); migrate(); }
   catch (e) { S = prev; if (prev) deriveWorld(); throw e; }
 }
 // Bring older v2 saves up to date (v2.0 → v2.1).
@@ -215,7 +215,7 @@ function migrate() {
   for (const d of S.divisions) { d.formation = d.formation || 'line'; d.stance = d.stance || 'advance'; d.target = d.target || 'nearest'; if (d.status === 'fighting') d.status = 'idle'; }
   for (const f of S.fleets) { f.formation = f.formation || 'line'; f.stance = f.stance || 'advance'; f.target = f.target || 'nearest'; if (f.status === 'fighting') f.status = 'idle'; }
   for (const a of S.aiArmies) if (a.kind === 'raid' && a.targetHex == null) a.targetHex = S.world.capital;
-  for (const k of S.kingdoms) { k.wars = k.wars || {}; if (k.guardsInit == null) initAiForces(k); }
+  for (const k of S.kingdoms) { k.wars = k.wars || {}; if (k.guardsInit == null && !k.fallen) initAiForces(k); }
 }
 
 // v2 → v3: the map was rebuilt from small hexes. Keep everything portable and

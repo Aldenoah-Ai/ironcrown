@@ -484,7 +484,7 @@ function drawWorld(g, t, dt) {
   const cap = S.world.capital;
   const occupied = new Set(S.buildings.map((b) => b.hex));
   const nearView = (i, pad) => WG.cx[i] >= vx0 - pad && WG.cx[i] <= vx1 + pad && WG.cy[i] >= vy0 - pad && WG.cy[i] <= vy1 + pad;
-  for (const k of S.kingdoms) if (isSeen(k.capital) && nearView(k.capital, W_HEX * 3 * (3 + k.hall))) for (const b of aiCity(k).buildings) occupied.add(b.hex);
+  for (const k of S.kingdoms) if (!k.fallen && isSeen(k.capital) && nearView(k.capital, W_HEX * 3 * (3 + k.hall))) for (const b of aiCity(k).buildings) occupied.add(b.hex);
   layer('terrain', () => {
   if (cheapTerrain) {                                    // the whole continent in one image
     blitView(g, atlasComposite(), ATLAS_S);
@@ -572,6 +572,17 @@ function drawWorld(g, t, dt) {
       g.fillStyle = pirate ? '#ddd' : shade(S.kingdoms[f.owner].color, 0.3); g.font = 'bold 9px sans-serif'; g.textAlign = 'center'; g.fillText(`⚓${shipCount(f.ships)}`, 0, 17); g.textAlign = 'left';
     });
   }
+  // ships lying at anchor beside the shipyard or port that holds them
+  for (const m of berths()) {
+    const n = shipCount(m.ships);
+    if (!n || !inView(m.hex)) continue;
+    const main = SHIP_TYPES.slice().reverse().find((st) => m.ships[st] > 0);
+    g.save(); g.translate(WG.cx[m.hex], WG.cy[m.hex]); g.scale(es * 0.8, es * 0.8); g.globalAlpha = 0.9;
+    drawShip(g, 0, 0, main, '#f2c14e', 1, t * 0.3 + m.hex, false, false, 1);
+    g.fillStyle = 'rgba(12,14,20,.75)'; g.fillRect(-13, 8, 26, 12);
+    g.fillStyle = '#e8d9a8'; g.font = 'bold 9px sans-serif'; g.textAlign = 'center'; g.fillText(`⚓${n}`, 0, 17); g.textAlign = 'left';
+    g.restore();
+  }
   // player forces
   for (const f of S.fleets) {
     if (f.status === 'fighting' || !inView(f.at)) continue;
@@ -605,7 +616,7 @@ function drawWorld(g, t, dt) {
   const label = (text, x, y, c) => { const w = g.measureText(text).width + 10; g.fillStyle = 'rgba(0,0,0,.65)'; g.fillRect(x - w / 2, y - fs, w, fs * 1.35); g.fillStyle = c; g.fillText(text, x, y); };
   const off = (r) => Math.max(r * W_HEX * 1.5, 26 / z);
   label(S.name, WG.cx[cap], WG.cy[cap] + off(landRadius() * 0.35), '#f2c14e');
-  for (const k of S.kingdoms) if (isSeen(k.capital)) label(`${k.name} · ${k.hall}${k.atWar ? ' ⚔' : ''}`, WG.cx[k.capital], WG.cy[k.capital] + off(1 + k.hall * 0.35), shade(k.color, 0.35));
+  for (const k of S.kingdoms) if (!k.fallen && isSeen(k.capital)) label(`${k.name} · ${k.hall}${k.atWar ? ' ⚔' : ''}`, WG.cx[k.capital], WG.cy[k.capital] + off(1 + k.hall * 0.35), shade(k.color, 0.35));
   g.textAlign = 'left';
   // selection + hover
   if (UI.worldSel >= 0 && !UI.selected) { g.strokeStyle = '#fff'; g.lineWidth = 2.5 / z; g.beginPath(); WG.hexPath(g, UI.worldSel, 0.92); g.stroke(); g.strokeStyle = '#f2c14e'; g.lineWidth = 1.5 / z; g.beginPath(); WG.hexPath(g, UI.worldSel, 1.05); g.stroke(); }

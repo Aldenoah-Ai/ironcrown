@@ -265,7 +265,8 @@ function renderBuildingInfo(b) {
       ${err ? `<div class="small muted" style="margin-top:4px">${esc(err)}</div>` : ''}</div>`;
   }
   if (d.trains) { h += '<h3>Training</h3>'; for (const u of d.trains) h += unitRow(u); }
-  if (d.builds) { h += '<h3>Shipbuilding</h3>'; for (const t of SHIP_TYPES) h += shipRow(t); }
+  if ((b.type === 'shipyard' || b.type === 'port') && b.level > 0) { const m = berthById(b.id); if (m) h += '<h3>Moored here</h3>' + berthCard(m); }
+  if (d.builds) { h += '<h3>Shipbuilding</h3><p class="small muted">Ships ordered here are launched into the water beside this shipyard.</p>'; for (const t of SHIP_TYPES) h += shipRow(t, b); }
   if (d.research) h += `<h3>Research</h3>` + uniCard(b) + `<p class="small">${btn('🎓 Open research tree', 'tab', 'research', { cls: 'sm ghost' })}</p>`;
   if (b.type === 'port' && b.level > 0) {
     const sell = (0.5 + 0.1 * b.level + 0.1 * R('trade')).toFixed(2), buy = (2.2 - 0.15 * b.level - 0.1 * R('trade')).toFixed(2);
@@ -293,15 +294,24 @@ function unitRow(u) {
     ${err ? `<div class="small muted" style="margin-top:4px">🔒 ${esc(err)}</div>` : ''}
     ${q.length && q.includes(u) ? `<div class="queue">${q.map((x, k) => `<span class="${k === 0 ? 'first' : ''}">${UNITS[x].icon}${k === 0 ? ' ' + fmtTime(t.trainLeft) : ''}</span>`).join('')}<button class="btn sm ghost" data-action="cancel-queue" data-arg="${t.id}" title="Cancel last">✕</button></div>` : ''}</div>`;
 }
-function shipRow(t) {
-  const Sh = SHIPS[t], st = shipStats(t, null), err = shipError(t);
-  const yards = S.buildings.filter((b) => b.type === 'shipyard' && b.queue.length);
-  return `<div class="card"><div class="unit-row"><span class="unit-ico">${Sh.icon}</span><div><b>${Sh.name}</b> <span class="muted">× ${S.harbor[t]} in harbour</span>
+// `yard`: when shown on one shipyard's own card, ships are laid down there.
+function shipRow(t, yard) {
+  const Sh = SHIPS[t], st = shipStats(t, null), err = shipError(t) || (yard && yard.level < Sh.lvl ? `Requires a level ${Sh.lvl} Shipyard` : null);
+  const yards = S.buildings.filter((b) => b.type === 'shipyard' && b.queue.length && (!yard || b === yard));
+  const here = yard ? (berthById(yard.id) || { ships: {} }).ships[t] || 0 : allShips()[t] - S.fleets.reduce((s, f) => s + (f.ships[t] || 0), 0);
+  return `<div class="card"><div class="unit-row"><span class="unit-ico">${Sh.icon}</span><div><b>${Sh.name}</b> <span class="muted">× ${here} ${yard ? 'moored here' : 'at anchor'}</span>
     <div class="stats-mini">⚔ ${st.atk.toFixed(0)} · ❤ ${st.hp.toFixed(0)} · 💨 ${st.speed.toFixed(2)}${Sh.cap ? ' · 🚣 carries ' + Sh.cap : ''} · ⏱${shipTime(t).toFixed(0)}s</div>
     <div class="stats-mini">${Sh.desc}</div><div>${costHtml(shipCost(t), S.res)} <span class="cost"><span class="${S.army.seaman < Sh.crew ? 'short' : ''}" title="Crew of Seamen">🧑‍✈️${Sh.crew}</span></span></div></div>
-    <div class="row">${btn('+1', 'build-ship', t + ':1', { cls: 'sm', disabled: !!err })}</div></div>
+    <div class="row">${btn('+1', 'build-ship', t + ':1' + (yard ? ':' + yard.id : ''), { cls: 'sm', disabled: !!err })}</div></div>
     ${err ? `<div class="small muted" style="margin-top:4px">🔒 ${esc(err)}</div>` : ''}
     ${yards.some((b) => b.queue.includes(t)) ? `<div class="queue">${yards.map((b) => b.queue.map((x, k) => `<span class="${k === 0 ? 'first' : ''}">${SHIPS[x].icon}${k === 0 ? ' ' + fmtTime(b.trainLeft) : ''}</span>`).join('') + `<button class="btn sm ghost" data-action="cancel-queue" data-arg="${b.id}">✕</button>`).join('')}</div>` : ''}</div>`;
+}
+// Ships at anchor, harbour by harbour, each with a button to put a fleet to sea from it.
+function berthCard(m) {
+  const n = shipCount(m.ships);
+  return `<div class="card"><div class="row"><span>${m.icon}</span><b>${esc(m.name)}</b><span class="spacer"></span>${btn('🎯', 'focus-hex', m.hex, { cls: 'sm ghost', title: 'Show on the map' })}</div>
+    <div class="pills">${n ? unitList(m.ships, SHIPS) : '<span class="small muted">No ships moored</span>'}</div>
+    ${n ? `<div class="row" style="margin-top:6px">${btn('⚓ Form a fleet here', 'form-fleet', m.id, { cls: 'sm', disabled: S.fleets.length >= fleetLimit(), title: S.fleets.length >= fleetLimit() ? 'Fleet limit reached' : '' })}</div>` : ''}</div>`;
 }
 
 /* ---------- Research tab ---------- */
@@ -329,7 +339,7 @@ function divisionCard(d) {
   const eta = etaOf(d), where = d.at === S.world.capital && !d.path.length ? 'At the capital' : `${d.path.length ? 'Marching' : 'Stationed'} at ${hexName(d.at)}`;
   return `<div class="card ${UI.selEntity && UI.selEntity.id === d.id ? 'hl' : ''}"><div class="row"><span class="swatch" style="background:${d.color}"></span><b>${esc(d.name)}</b><span class="spacer"></span><span class="small muted">⚡${fmt(armyPower(d.units, d.general))}</span></div>
     <div class="pills">${unitList(d.units, UNITS)}</div>
-    <div class="small">${where}${d.path.length ? ` · ${d.order ? d.order.type : 'move'} · ETA ${fmtTime(eta)}` : d.at !== S.world.capital ? ' · 🛡️ guarding' : ''}${d.status === 'fighting' ? ' · ⚔ fighting' : ''}</div>
+    <div class="small">${where}${d.path.length ? ` · ${d.order ? d.order.type : 'move'} · ETA ${fmtTime(eta)}` : d.at !== S.world.capital ? ' · 🛡️ guarding' : ''}${d.status === 'fighting' ? ' · ⚔ fighting' : ''}${d.waitAttack != null && d.status !== 'fighting' ? ` · ⏳ attacks ${hexName(d.waitAttack)} ${onCooldown(d) ? `in ${Math.ceil(d.cooldown - S.time)}s` : 'when the nearby battle ends'}` : ''}</div>
     <div class="small muted">👁️ Attacks any enemy within ${detectRange(d, !d.path.length)} hexes${d.units.scout > 0 ? ' (scouts extend the watch)' : ''}</div>
     <div class="row small" style="margin-top:4px"><span class="muted">General</span><select data-divgen="${d.id}">${[d.general].concat(idleGenerals().map((g) => g.uid)).concat(S.divisions.filter((x) => x !== d && x.general).map((x) => x.general)).filter((v, k, arr) => v && arr.indexOf(v) === k).map((u) => { const gd = generalData(u), post = generalPost(u); return `<option value="${u}" ${u === d.general ? 'selected' : ''}>${gd.icon} ${esc(gd.name)} ${'★'.repeat(genInst(u).stars)}${u === d.general ? '' : post.kind === 'division' ? ' (swap)' : ''}</option>`; }).join('')}</select></div>
     ${battleDefaults(d, 'division')}
@@ -378,12 +388,17 @@ function renderNavy() {
   let h = `<h2>Navy</h2><dl class="kv"><dt>Ships (all)</dt><dd>${shipCount(allShips())} + ${queuedShips()} queued</dd><dt>Troop transport capacity</dt><dd>🚣 ${transportCapacity()}</dd>
     <dt>Ship upkeep</dt><dd>💰 ${(upkeep().gold * 60).toFixed(1)}/min</dd>${S.winds > 0 ? `<dt>Favourable winds</dt><dd>🌬️ ${fmtTime(S.winds)}</dd>` : ''}</dl>
     <h3>Seamen · ${S.army.seaman} ready</h3><p class="small muted">Every ship needs a crew of Seamen, trained at the Port. Crews go down with their ship.</p>${unitRow('seaman')}
-    <h3>Home harbour</h3><div class="pills">${unitList(S.harbor, SHIPS)}</div><p class="small muted">Ships in harbour defend your port from pirates. Fleets can also dock at any Dock you build on the coast.</p>
+    <h3>Harbours</h3><p class="small muted">New ships are launched beside the shipyard that built them, and a fleet sets sail from wherever its ships lie. Moored ships guard their harbour; a fleet can disband at any of your shipyards or ports.</p>${berths().filter((m) => m.id === 'home' || shipCount(m.ships) > 0 || m.b.type === 'shipyard').map(berthCard).join('')}
     <h3>Fleets · ${S.fleets.length}/${fleetLimit()}</h3>
     <p class="small muted">Group ships into fleets and sail them on the World map: explore, salvage shipwrecks, burn pirate coves, blockade enemy ports and hunt enemy fleets. Cogs & Galleons carry divisions across the sea automatically.</p>`;
   h += S.fleets.map(fleetCard).join('') || '<p class="small muted">No fleets at sea.</p>';
-  h += `<div class="row">${btn('⚓ Form a new fleet', 'form-fleet', '', { disabled: S.fleets.length >= fleetLimit() || shipCount(S.harbor) === 0, title: shipCount(S.harbor) ? '' : 'Build ships first' })}</div><h3>Shipyard</h3>`;
+  h += `<div class="row">${btn('⚓ Form a new fleet', 'form-fleet', '', { disabled: S.fleets.length >= fleetLimit() || shipsAtBerths() === 0, title: shipsAtBerths() ? '' : 'Build ships first' })}</div><h3>Shipyard</h3>`;
   if (!countOf('shipyard')) h += `<div class="card small">🚢 No shipyard yet. ${hallLevel() >= 2 ? btn('Build one on the coast', 'place', 'shipyard', { cls: 'sm' }) : 'Reach <b>Main Hall 2</b>, then build one on the coast.'}</div>`;
+  const yards = S.buildings.filter((b) => b.type === 'shipyard' && b.level > 0);
+  if (yards.length > 1) {
+    if (UI.yard && !yards.some((b) => String(b.id) === UI.yard)) UI.yard = '';
+    h += `<div class="row"><span class="small muted">Build at</span><select data-yardsel="1"><option value="">Least busy shipyard</option>${yards.map((b) => `<option value="${b.id}" ${String(b.id) === UI.yard ? 'selected' : ''}>🚢 L${b.level} at ${hexName(b.hex)} · ${b.queue.length} queued</option>`).join('')}</select></div>`;
+  }
   for (const t of SHIP_TYPES) h += shipRow(t);
   return h;
 }
@@ -489,7 +504,7 @@ function renderWorldInfo() {
   if (i >= 0) h += hexCard(i);
   h += '<h3>Known kingdoms</h3>';
   const known = S.kingdoms.filter((k) => isSeen(k.capital));
-  h += known.map((k) => { const a = allianceOf(k.allianceId); return `<div class="member clickable" data-action="focus-kingdom" data-arg="${k.id}"><span class="dot" style="background:${k.color}"></span><div><b>${k.name}</b><div class="small muted">Keep ${k.hall} · ${kingdomTiles(k.id)} hexes${a ? ' · ' + a.emblem + ' ' + esc(a.name) : ''}</div></div><span class="spacer"></span><span class="small">${relationBar(k)}</span></div>`; }).join('') || '<p class="small muted">None yet — scout into the fog.</p>';
+  h += known.map((k) => { if (k.fallen) return `<div class="member clickable" data-action="focus-kingdom" data-arg="${k.id}"><span class="dot" style="background:${k.color}"></span><div><b>${k.name}</b><div class="small muted">👑 Conquered</div></div></div>`; const a = allianceOf(k.allianceId); return `<div class="member clickable" data-action="focus-kingdom" data-arg="${k.id}"><span class="dot" style="background:${k.color}"></span><div><b>${k.name}</b><div class="small muted">Keep ${k.hall} · ${kingdomTiles(k.id)} hexes${a ? ' · ' + a.emblem + ' ' + esc(a.name) : ''}</div></div><span class="spacer"></span><span class="small">${relationBar(k)}</span></div>`; }).join('') || '<p class="small muted">None yet — scout into the fog.</p>';
   return h;
 }
 // Settling neutral land: pick how big a region the settlers take.
@@ -535,19 +550,22 @@ function hexCard(i) {
   return h;
 }
 function kingdomCard(k) {
+  if (k.fallen) return `<div class="card hl"><div class="row"><span class="dot" style="background:${k.color};width:16px;height:16px"></span><div><b>${k.name}</b><div class="small muted">👑 Conquered — its land is part of your realm now</div></div></div></div>`;
   const intel = S.intel[k.id], a = allianceOf(k.allianceId), allied = S.allianceId && k.allianceId === S.allianceId;
   let h = `<div class="card hl"><div class="row"><span class="dot" style="background:${k.color};width:16px;height:16px"></span><div><b>${k.name}</b><div class="small muted">${k.ruler} · ${PERSONALITIES[k.personality].name}${k.coastal ? ' · coastal' : ''}</div></div></div>
     <dl class="kv" style="margin-top:8px"><dt>Relation</dt><dd>${relationBar(k)}</dd><dt>Alliance</dt><dd>${a ? a.emblem + ' ' + esc(a.name) : '—'}</dd>
     ${k.treaty > 0 ? `<dt>Treaty</dt><dd>🕊️ ${fmtTime(k.treaty)}</dd>` : ''}${k.tradePact ? '<dt>Trade pact</dt><dd>⚖️ +5% gold</dd>' : ''}`;
   if (intel) h += `<dt>Keep level</dt><dd>${intel.hall}</dd><dt>Army (est.)</dt><dd>⚡ ~${fmt(intel.power)}</dd><dt>Defenses (est.)</dt><dd>🛡️ ~${fmt(intel.defense)}</dd>${k.coastal ? `<dt>Navy (est.)</dt><dd>⚓ ~${fmt(intel.navy)}</dd>` : ''}<dt>Treasury</dt><dd>💰${fmt(intel.res.gold)} 🌳${fmt(intel.res.lumber)}</dd><dt>Intel age</dt><dd>${fmtTime(S.time - intel.t)}</dd>`;
   else h += '<dt>Intel</dt><dd class="muted">Unknown — send scouts</dd>';
+  const ring = capitalRing(k), held = ring.filter((n) => S.world.owner[n] === -2).length;
+  if (!allied && ring.length) h += `<dt>Siege</dt><dd title="Hold every open hex around the capital and the kingdom surrenders">🏰 ${held}/${ring.length} hexes around the capital held</dd>`;
   h += `</dl><h3>Diplomacy</h3><div class="row wrap">${btn('🎁 Gift 💰200', 'diplo', 'gift:' + k.id, { cls: 'ghost sm' })}
     ${k.atWar ? btn(`🕊️ Make peace 💰${400 * k.hall}`, 'diplo', 'peace:' + k.id, { cls: 'sm' }) : btn('🕊️ Treaty 💰400', 'diplo', 'treaty:' + k.id, { cls: 'ghost sm', title: 'Non-aggression for 20 min (relation 10+)' })}
     ${btn(k.tradePact ? '⚖️ End pact' : '⚖️ Trade pact', 'diplo', 'pact:' + k.id, { cls: 'ghost sm', title: 'Relation 35+: +5% gold' })}
     ${btn('💰 Demand tribute', 'diplo', 'tribute:' + k.id, { cls: 'ghost sm' })}
     ${!k.atWar && !allied ? btn('⚔️ Declare war', 'diplo', 'war:' + k.id, { cls: 'red sm' }) : ''}
     ${S.allianceId && allianceOf(S.allianceId).leader === 'P' && !allied ? btn('🤝 Invite', 'invite', k.id, { cls: 'blue sm' }) : ''}</div>
-    <p class="small muted" style="margin-top:6px">To attack: select a division on the map, click their capital and choose <b>Assault</b>. Coastal kingdoms can be blockaded by fleets.</p></div>`;
+    <p class="small muted" style="margin-top:6px">To attack: select a division on the map, click their land and choose <b>Invade</b>, or their capital and choose <b>Assault</b>. Hold every hex around the capital and the kingdom surrenders. Coastal kingdoms can be blockaded by fleets.</p></div>`;
   return h;
 }
 
@@ -568,7 +586,7 @@ function renderAlliance() {
     }
     h += '</div>';
     if (leader) {
-      const cands = S.kingdoms.filter((k) => k.allianceId !== a.id);
+      const cands = S.kingdoms.filter((k) => !k.fallen && k.allianceId !== a.id);
       h += `<h3>Manage</h3><div class="row wrap">${btn(a.open ? '🔓 Open recruitment' : '🔒 Invite only', 'toggle-open', '', { cls: 'sm ghost' })}</div>
         <div class="card" style="margin-top:8px"><b class="small">Invite kingdoms</b>` + (cands.map((k) => `<div class="member"><span class="dot" style="background:${k.color}"></span><div class="small"><b>${k.name}</b><div>${relationBar(k)}${k.allianceId ? ' · in ' + esc(allianceOf(k.allianceId).name) : ''}</div></div><span class="spacer"></span>${btn('Invite', 'invite', k.id, { cls: 'sm blue' })}</div>`).join('') || '<div class="small muted">Every kingdom has joined you!</div>') + '</div>';
     }
@@ -591,7 +609,7 @@ function renderAlliance() {
       <div class="row" style="margin-top:10px">${costHtml({ gold: 1000 }, S.res)}<span class="spacer"></span>${btn('Found alliance', 'create-alliance', '', { disabled: S.res.gold < 1000 })}</div></div>`;
   }
   const rows = [{ name: S.name + ' (you)', power: totalPower(), color: '#f2c14e', you: true }]
-    .concat(S.kingdoms.map((k) => ({ name: isSeen(k.capital) ? k.name : '??? (unscouted)', power: k.power + k.defense + k.navy, color: k.color }))).sort((x, y) => y.power - x.power);
+    .concat(liveKingdoms().map((k) => ({ name: isSeen(k.capital) ? k.name : '??? (unscouted)', power: k.power + k.defense + k.navy, color: k.color }))).sort((x, y) => y.power - x.power);
   h += '<h3>Realm ranking</h3><div class="card">' + rows.map((r, n) => `<div class="member"><b style="width:20px">${n + 1}</b><span class="dot" style="background:${r.color}"></span><span ${r.you ? 'style="color:var(--gold);font-weight:700"' : ''}>${esc(r.name)}</span><span class="spacer"></span><span class="small">⚡ ${fmt(r.power)}</span></div>`).join('') + '</div>';
   if (API.online) {
     if (Date.now() - leaderboardCache.t > 30000) { leaderboardCache.t = Date.now(); API.leaderboard().then((d) => { leaderboardCache.data = d; UI.panelDirty = true; }); }

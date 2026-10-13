@@ -384,11 +384,13 @@ await test('port trains seamen, shipyard builds crewed ships, form a fleet and s
   await page.click('[data-action="build-ship"][data-arg="cog:1"]');
   await ff(40);
   const hs = await state();
-  assert(hs.harbor.cog === 1 && hs.army.seaman === sea0 - 14, 'ships launched into harbour with their crews aboard (6 + 8 seamen)');
+  const yardBerth = await G(() => { const m = berths().find((x) => x.b && x.b.type === 'shipyard'); return m && { hex: m.hex, cog: m.ships.cog, sloop: m.ships.sloop }; });
+  assert(yardBerth && yardBerth.cog === 1 && yardBerth.sloop === 1 && hs.army.seaman === sea0 - 14, 'ships launched beside the shipyard with their crews aboard (6 + 8 seamen)');
   await page.click('[data-action="form-fleet"]');
   await page.click('#fleet-yes');
   const f = (await state()).fleets[0];
   assert(f && f.ships.sloop === 1, 'fleet formed');
+  assert(f.at === yardBerth.hex, 'the fleet set sail from the shipyard');
   await shot('08-navy');
   const water = await G((h) => { const W = window.ironcrown.debug.WG; return W.within(h, 4).filter((i) => isWater(i) && OCEAN[i]).sort((a, b) => W.dist(b, h) - W.dist(a, h))[0]; }, f.at);
   await G(([id, w]) => { const f = window.ironcrown.state.fleets.find((x) => x.id === id); window.ironcrown.api.giveOrder(f, 'move', w); }, [f.id, water]);
@@ -1477,6 +1479,100 @@ await test('export downloads a small save file, and importing it (or an old-styl
   await p.waitForTimeout(200);
   assert((await p.textContent('#import-status')).includes('⚠️'), 'the dialog says why');
   assert((await p.evaluate(() => S.name)) === 'Oldcode', 'the game is untouched');
+  assert(errs.length === 0, errs.join('\n'));
+  await ctx.close();
+});
+
+await test('ships are launched beside the shipyard that built them, and fleets sail from there', async () => {
+  const { ctx, p, errs } = await freshPage();
+  await p.goto(url('&reset=1')); await p.waitForSelector('body[data-ready="1"]');
+  await p.evaluate(() => { document.getElementById('begin-btn').click(); setSpeed(0); });
+  // a shipyard far down the coast from the capital
+  const yard = await p.evaluate(() => {
+    const cap = S.world.capital;
+    const hex = WG.within(cap, 45).filter((i) => isCoastal(i) && !buildingAt(i) && WG.dist(i, cap) > 12 && WG.neighbors(i).some((n) => OCEAN[n]))
+      .sort((a, b) => WG.dist(b, cap) - WG.dist(a, cap))[0];
+    S.world.owner[hex] = -2; ownedChanged();
+    const b = addBuilding('shipyard', hex, 2);
+    cheats.res(1e5); S.army.seaman = 40;
+    return { id: b.id, hex };
+  });
+  // order a ship from that yard's own card
+  await p.evaluate((id) => ACTIONS.select(id), yard.id);
+  await p.click(`[data-action="build-ship"][data-arg="sloop:1:${yard.id}"]`);
+  await p.evaluate(() => window.ironcrown.debug.fastForward(120));
+  const r = await p.evaluate((id) => { const m = berthById(id); return { hex: m.hex, sloop: m.ships.sloop, home: shipCount(S.harbor), water: isWater(m.hex) }; }, yard.id);
+  assert(r.sloop === 1 && r.home === 0, `the sloop lies at the shipyard, not the capital (${r.sloop} there, ${r.home} at home)`);
+  assert(r.water && (await p.evaluate(([a, b]) => WG.dist(a, b), [r.hex, yard.hex])) === 1, 'moored in the water right beside the yard');
+  // form the fleet from the Navy tab: it puts to sea at the shipyard
+  await p.evaluate(() => setTab('navy'));
+  await p.click(`[data-action="form-fleet"][data-arg="${yard.id}"]`);
+  assert((await p.inputValue('#fleet-berth')) === String(yard.id), 'the dialog starts at that harbour');
+  await p.click('#fleet-yes');
+  const f = await p.evaluate(() => S.fleets[0] && { at: S.fleets[0].at, n: shipCount(S.fleets[0].ships) });
+  assert(f && f.n === 1 && f.at === r.hex, 'the fleet set sail from the shipyard');
+  assert(await p.evaluate(() => WG.dist(S.fleets[0].at, S.world.harbor) > 8), 'nowhere near the capital');
+  // disband there and the ships moor there again; demolish the yard and they sail home
+  const back = await p.evaluate((id) => { disbandFleet(S.fleets[0]); const n = berthById(id).ships.sloop; demolish(S.buildings.find((b) => b.id === id)); return { n, home: S.harbor.sloop }; }, yard.id);
+  assert(back.n === 1 && back.home === 1, 'moored at the yard after disbanding, home once the yard is gone');
+  assert(errs.length === 0, errs.join('\n'));
+  await ctx.close();
+});
+
+await test('an invasion that cannot start at once waits and then attacks, instead of vanishing', async () => {
+  const { ctx, p, errs } = await freshPage();
+  await p.goto(url('&reset=1')); await p.waitForSelector('body[data-ready="1"]');
+  const r = await p.evaluate(() => {
+    document.getElementById('begin-btn').click(); setSpeed(0); SETTINGS.battleMode = 'auto';
+    cheats.army(400); S.res.food = 1e6;
+    const gid = S.generals.find((g) => generalPost(g.uid).kind === 'none').uid;
+    cheats.army(6000);
+    const d = window.ironcrown.api.createDivision('Vanguard', { swordsman: 2500, archer: 2500, horseman: 1000 }, gid);
+    const k = S.kingdoms.slice().sort((a, b) => WG.dist(a.capital, S.world.capital) - WG.dist(b.capital, S.world.capital))[0];
+    // close enough to the capital that its garrison stands in the way, so there has to be a battle
+    const hex = WG.within(k.capital, 4).filter((i) => S.world.owner[i] === k.id && isPassable(i) && WG.dist(i, k.capital) >= 3)[0];
+    d.at = WG.neighbors(hex).find((n) => isPassable(n) && S.world.owner[n] !== k.id) ?? WG.neighbors(hex).find(isPassable);
+    d.cooldown = S.time + 20;                       // just fought something on the way in
+    S.aiArmies = S.aiArmies.filter((a) => a.kid !== k.id);   // nobody else to fight
+    window.ironcrown.api.giveOrder(d, 'attack', hex);
+    for (let t = 0; t < 5; t++) step(1);
+    const waiting = d.waitAttack === hex && S.world.owner[hex] === k.id;
+    const note = S.log.some((l) => /will attack .* as soon as it can/.test(l.text));
+    for (let t = 0; t < 60 && S.world.owner[hex] === k.id; t++) { step(1); for (const b of window.ironcrown.Battles.list) if (!b.done) window.ironcrown.Battles.resolve(b.id); }
+    return { waiting, note, taken: S.world.owner[hex] === -2, cleared: d.waitAttack == null };
+  });
+  assert(r.waiting && r.note, 'the division holds and says it will attack when it can');
+  assert(r.taken && r.cleared, 'it attacked once rested, and the hex is yours');
+  assert(errs.length === 0, errs.join('\n'));
+  await ctx.close();
+});
+
+await test('surrounding a capital makes the whole kingdom surrender', async () => {
+  const { ctx, p, errs } = await freshPage();
+  await p.goto(url('&reset=1')); await p.waitForSelector('body[data-ready="1"]');
+  const r = await p.evaluate(() => {
+    document.getElementById('begin-btn').click(); setSpeed(0); SETTINGS.battleMode = 'auto';
+    cheats.army(4000); S.res.food = 1e6;
+    const k = S.kingdoms.slice().sort((a, b) => WG.dist(a.capital, S.world.capital) - WG.dist(b.capital, S.world.capital))[0];
+    const ring = capitalRing(k), land0 = kingdomTiles(k.id), mine0 = playerTiles();
+    for (const n of ring.slice(1)) S.world.owner[n] = -2;
+    ownedChanged();
+    const before = { fallen: !!k.fallen, siege: (UI.worldSel = k.capital, kingdomCard(k)).includes(`${ring.length - 1}/${ring.length}`) };
+    const gid = S.generals.find((g) => generalPost(g.uid).kind === 'none').uid;
+    const d = window.ironcrown.api.createDivision('Besiegers', { swordsman: 1500, archer: 1500, horseman: 500 }, gid);
+    d.at = WG.neighbors(ring[0]).find((n) => isPassable(n) && n !== k.capital) ?? ring[0];
+    window.ironcrown.api.giveOrder(d, 'attack', ring[0]);
+    for (let t = 0; t < 400 && !k.fallen; t++) { step(1); for (const b of window.ironcrown.Battles.list) if (!b.done) window.ironcrown.Battles.resolve(b.id); }
+    for (let t = 0; t < 300; t++) step(1);
+    return { before, fallen: !!k.fallen, left: kingdomTiles(k.id), gained: playerTiles() - mine0, land0, cap: S.world.owner[k.capital],
+      armies: S.aiArmies.filter((a) => a.kid === k.id && a.kind !== 'home').length, raider: raidCandidates().includes(k),
+      allied: S.alliances.some((a) => a.members.includes(k.id)), told: S.log.some((l) => /has fallen/.test(l.text)), card: kingdomCard(k).includes('Conquered') };
+  });
+  assert(!r.before.fallen && r.before.siege, 'the kingdom card counts the hexes held around the capital');
+  assert(r.fallen && r.told, 'the kingdom surrendered and the log says so');
+  assert(r.left === 0 && r.cap === -2 && r.gained >= r.land0, `its realm is yours (${r.gained} hexes gained of ${r.land0})`);
+  assert(r.armies === 0 && !r.raider && !r.allied, 'it fields no armies, sends no raids and has left its alliance');
+  assert(r.card, 'it is shown as conquered');
   assert(errs.length === 0, errs.join('\n'));
   await ctx.close();
 });

@@ -93,7 +93,7 @@ const HELP = [
     <table class="keys"><tr><th>Ship</th><th>Shipyard</th><th>Role</th></tr>
       ${Object.values(SHIPS).map((s) => `<tr><td>${s.icon} ${s.name}</td><td>L${s.lvl}</td><td>${s.desc} Crew ${s.crew}.</td></tr>`).join('')}</table>
     <ul>
-      <li>New ships wait in the <b>home harbour</b>, where they guard your port against pirates. <b>Form a fleet</b> to send them out, with an admiral if you have one.</li>
+      <li>New ships are <b>launched beside the shipyard that built them</b> and lie at anchor there, guarding that harbour. With several shipyards, pick which one builds from the Navy tab (or from the shipyard itself). <b>Form a fleet</b> and it sets sail from the harbour its ships lie at, with an admiral if you have one. A fleet can disband at the home harbour or beside any of your shipyards and ports, and its ships moor there.</li>
       <li>Select a fleet on the World map to: <b>Sail</b>, <b>Salvage</b> shipwrecks, <b>Attack pirate coves</b>, <b>Blockade</b> a coastal kingdom (sink its navy and plunder its harbour), or <b>Hunt</b> enemy fleets.</li>
       <li>Fleets reveal the fog as they sail. <b>Cogs</b> and <b>Galleons</b> give your divisions transport capacity to cross the sea to islands.</li>
       <li>🏴‍☠️ <b>Pirates</b> sail from their coves and prey on your fleets and harbour. If your harbour has no ships, they steal gold and blockade your port.</li>
@@ -139,6 +139,8 @@ const HELP = [
       <li><b>Battles are fought on the real landscape.</b> Nothing is faked for the fight: the towers on the field are the buildings that actually stand there, on their real hexes, with their real type and level. Build more of them and more of them fight. <b>Towers shoot at towers too</b> — Cannons and Arcane Spires would rather knock the enemy's stonework down than chase infantry. Walls stiffen your towers; Masonry and Fortification research help too.</li>
       <li><b>Field Medicine</b> saves part of your casualties. War Horns and Healing Salves boost your next battle.</li>
       <li>Winning an assault on a capital loots its treasury and can seize border hexes.</li>
+      <li><b>Invading</b> a hex takes it and its neighbours. If only a few militia hold it and your division is far stronger, they surrender without a fight. If your division is still recovering from a fight on the way in (or another battle is raging nearby), it waits on the spot and attacks the moment it can.</li>
+      <li>👑 <b>Conquering a kingdom:</b> hold every open hex around its capital and the city is cut off. It surrenders, and its whole realm and much of its treasury become yours. A kingdom's card shows how many of those hexes you hold.</li>
     </ul>` },
   { id: 'diplomacy', icon: '🕊️', title: 'AI kingdoms & diplomacy', html: `
     <p>Every kingdom keeps <b>🛡 guard armies</b> that move around its land, and coastal kingdoms keep <b>⚓ navy patrols</b> at sea. You can attack any army or fleet, but attacking a kingdom you aren't at war with makes it hostile.</p>

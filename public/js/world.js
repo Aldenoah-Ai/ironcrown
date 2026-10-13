@@ -349,7 +349,7 @@ function scoutEnter(p) {
   reveal(p.at, scoutRadius());
   const f = S.world.feat[p.at];
   if (f && f.type === 'cave' && !f.explored) { f.explored = true; featChanged(); log(`Scouts found ${MINERALS[f.mineral].name} in a cave!`, 'good'); toast(`🕳️ Scouts found ${MINERALS[f.mineral].name}`, 'good'); }
-  for (const k of S.kingdoms) if (WG.dist(k.capital, p.at) <= scoutRadius() + 2) { if (!S.intel[k.id] || S.time - S.intel[k.id].t > 60) log(`Scouts gathered intel on ${k.name}.`, 'info'); gatherIntel(k); }
+  for (const k of S.kingdoms) if (!k.fallen && WG.dist(k.capital, p.at) <= scoutRadius() + 2) { if (!S.intel[k.id] || S.time - S.intel[k.id].t > 60) log(`Scouts gathered intel on ${k.name}.`, 'info'); gatherIntel(k); }
   const o = S.world.owner[p.at];
   if (o >= 0 && Math.random() < 0.015 * (hostileToPlayer(S.kingdoms[o]) ? 2 : 1) * (1 - 0.25 * R('espionage'))) {
     p.n--; p.name = `Scouts ×${p.n}`;

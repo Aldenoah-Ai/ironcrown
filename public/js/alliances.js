@@ -135,7 +135,7 @@ function allianceTurn(offline) {
     addAllianceXp(a, ai.reduce((s, m) => s + S.kingdoms[m].hall * 15, 0));
     if (!offline && ai.length && Math.random() < 0.35) {
       const me = S.kingdoms[pick(ai)];
-      const enemies = S.kingdoms.filter((k) => k.allianceId !== a.id);
+      const enemies = S.kingdoms.filter((k) => !k.fallen && k.allianceId !== a.id);
       const enemy = enemies.length ? pick(enemies).name : 'the pirates';
       chat(a, me.id, pick([
         `Anyone have spare ${pick(['lumber', 'iron', 'food'])}? Building a new ${pick(['tower', 'granary', 'shipyard'])}.`,
@@ -148,7 +148,7 @@ function allianceTurn(offline) {
       ]));
     }
     if (a.leader !== 'P' && a.open && Math.random() < 0.03) {
-      const free = S.kingdoms.filter((k) => k.allianceId == null);
+      const free = S.kingdoms.filter((k) => !k.fallen && k.allianceId == null);
       if (free.length) { const k = pick(free); a.members.push(k.id); k.allianceId = a.id; if (!offline && isSeen(k.capital)) log(`${k.name} joined ${a.name}.`, 'info'); }
     }
   }

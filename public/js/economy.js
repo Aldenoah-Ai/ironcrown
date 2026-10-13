@@ -176,6 +176,7 @@ function demolish(b) {
   const refund = {};
   for (const [k, v] of Object.entries(costFor(b.type, Math.max(1, b.level)))) refund[k] = Math.floor(v * 0.4);
   gain(refund);
+  strandShips(b);
   S.buildings = S.buildings.filter((x) => x !== b);
   markChunks(b.hex);
   UI.selected = null;

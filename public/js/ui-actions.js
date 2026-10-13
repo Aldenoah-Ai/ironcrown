@@ -87,10 +87,16 @@ function showMuster() {
     <h3>Battle plan</h3><div class="row wrap"><select id="div-form">${Object.entries(FORMATIONS).map(([k, f]) => `<option value="${k}">${f.icon} ${f.name}</option>`).join('')}</select><select id="div-stance">${Object.entries(STANCES).map(([k, f]) => `<option value="${k}">${f.icon} ${f.name}</option>`).join('')}</select></div>
     <div class="actions">${btn('Cancel', 'close-modal', '', { cls: 'ghost' })}${btn('Muster', 'muster-yes', '', { id: 'muster-yes' })}</div>`);
 }
-function showFormFleet() {
-  showModal(`<h2>⚓ Form a fleet</h2><p class="small muted">Ships leave the home harbour and sail as one fleet.</p>
-    <input type="text" id="fleet-name" placeholder="Fleet name" value="${esc(pick(['Royal', 'Northern', 'Storm', 'Golden', 'Iron']) + ' ' + pick(['Squadron', 'Armada', 'Flotilla', 'Fleet']))}" maxlength="24" />
-    <h3>Ships</h3>${sliderRows(S.harbor, SHIPS, 'fl')}
+// The fleet sets sail from the berth its ships lie at — pick which one.
+function showFormFleet(berthId) {
+  const all = berths().filter((m) => shipCount(m.ships) > 0);
+  if (!all.length) { toast('No ships at anchor — build some at a shipyard first', 'bad'); return; }
+  const m = all.find((x) => x.id === String(berthId)) || all.sort((a, b) => shipCount(b.ships) - shipCount(a.ships))[0];
+  const keep = el('fleet-name') ? el('fleet-name').value : pick(['Royal', 'Northern', 'Storm', 'Golden', 'Iron']) + ' ' + pick(['Squadron', 'Armada', 'Flotilla', 'Fleet']);
+  showModal(`<h2>⚓ Form a fleet</h2><p class="small muted">The fleet sets sail from the harbour its ships lie at.</p>
+    <input type="text" id="fleet-name" placeholder="Fleet name" value="${esc(keep)}" maxlength="24" />
+    <h3>Sail from</h3><select id="fleet-berth" data-fleetberth="1">${all.map((x) => `<option value="${x.id}" ${x === m ? 'selected' : ''}>${x.icon} ${esc(x.name)} · ${shipCount(x.ships)} ship${shipCount(x.ships) === 1 ? '' : 's'}</option>`).join('')}</select>
+    <h3>Ships</h3>${sliderRows(m.ships, SHIPS, 'fl')}
     <h3>Admiral (optional)</h3>${generalSelect('fleet-general', true)}
     <div class="actions">${btn('Cancel', 'close-modal', '', { cls: 'ghost' })}${btn('Set sail', 'fleet-yes', '', { id: 'fleet-yes' })}</div>`);
 }
@@ -168,7 +174,13 @@ const ACTIONS = {
   'demolish-yes'(id) { closeModal(); demolish(S.buildings.find((b) => b.id === +id)); },
   'clear-obstacle'(i) { if (clearObstacle(+i)) UI.selHex = -1; },
   train(arg) { const [u, n] = arg.split(':'); const m = trainUnits(u, +n); if (m) toast(`Training ${m} ${UNITS[u].name}${m > 1 ? 's' : ''}`); },
-  'build-ship'(arg) { const [t, n] = arg.split(':'); const m = buildShips(t, +n); if (m) toast(`${SHIPS[t].name} laid down at the shipyard`); },
+  'build-ship'(arg) {
+    const [t, n, yard] = arg.split(':');
+    const y = yard || UI.yard || '';
+    const m = buildShips(t, +n, y);
+    const b = y ? S.buildings.find((x) => x.id === +y) : null;
+    if (m) toast(`${SHIPS[t].name} laid down at the shipyard${b ? ' at ' + hexName(b.hex) : ''}`);
+  },
   'cancel-queue'(id) { cancelQueue(S.buildings.find((b) => b.id === +id)); },
   research(id) { startResearch(id); },
   tab(t) { setTab(t); },
@@ -217,8 +229,11 @@ const ACTIONS = {
     const d = createDivision(el('div-name').value, readSliders('mu'), el('div-general').value || null);
     if (d) { d.formation = el('div-form').value; d.stance = el('div-stance').value; closeModal(); toast(`⚔️ ${d.name} mustered under ${generalData(d.general).name}`, 'good'); }
   },
-  'form-fleet'() { showFormFleet(); },
-  'fleet-yes'() { const f = createFleet(el('fleet-name').value, readSliders('fl'), el('fleet-general').value || null); if (f) { closeModal(); toast(`⚓ ${f.name} formed`, 'good'); } },
+  'form-fleet'(berth) { showFormFleet(berth); },
+  'fleet-yes'() {
+    const f = createFleet(el('fleet-name').value, readSliders('fl'), el('fleet-general').value || null, el('fleet-berth') ? el('fleet-berth').value : null);
+    if (f) { closeModal(); toast(`⚓ ${f.name} formed at ${hexName(f.at)}`, 'good'); }
+  },
   'edit-troops'(id) {
     const d = S.divisions.find((x) => x.id === id);
     if (!d) return toast('That division is gone', 'bad');
@@ -397,6 +412,8 @@ function bindInput() {
       toast(`${generalData(uidv).name} now leads ${div.name}`, 'good'); e.target.blur(); UI.panelDirty = true; renderPanel(true);
     }
     for (const [attr, field] of [['entform', 'formation'], ['entstance', 'stance'], ['enttarget', 'target']]) if (d[attr]) { const ent = findEnt(d[attr]); if (ent) ent[field] = e.target.value; e.target.blur(); }
+    if (d.fleetberth) { showFormFleet(e.target.value); return; }
+    if (d.yardsel !== undefined) { UI.yard = e.target.value; UI.panelDirty = true; renderPanel(true); return; }
     if (d.claimradius) { UI.claimRadius = +e.target.value; UI.panelDirty = true; renderPanel(true); return; }
     if (d.btarget) { const [id, gi] = d.btarget.split(':'); const b = Battles.get(+id); if (b) Battles.setTarget(b, +gi, e.target.value); e.target.blur(); }
     if (d.bform) { const [id, gi] = d.bform.split(':'); const b = Battles.get(+id); if (b) Battles.setFormation(b, +gi, e.target.value); e.target.blur(); }

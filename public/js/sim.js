@@ -33,7 +33,7 @@ function giveOrder(ent, type, hex, extra = {}, quiet) {
     if (!quiet) toast(isScout(ent) ? 'Scouts cannot reach that spot' : isFleet(ent) ? 'No sea route there' : (isWater(hex) ? 'Divisions need transport ships (Cogs) to cross water' : 'No route there — mountains or sea block the way'), 'bad');
     return false;
   }
-  ent.path = path; ent.prog = 0; ent.order = { type, hex, ...extra }; ent.status = path.length ? 'moving' : 'idle';
+  ent.path = path; ent.prog = 0; ent.order = { type, hex, ...extra }; ent.status = path.length ? 'moving' : 'idle'; ent.waitAttack = null;
   if (!path.length) arrive(ent);
   UI.panelDirty = true;
   return true;
@@ -112,7 +112,8 @@ function applyCasualties(units, survivors, keys) {
   }
   return lost;
 }
-const lostText = (lost, table) => Object.entries(lost).map(([k, n]) => `${n} ${table[k].name}${n > 1 ? 's' : ''}`).join(', ') || 'none';
+const plural = (name) => (/man$/.test(name) ? name.replace(/man$/, 'men') : /o' War$/.test(name) ? name.replace("Man o' War", "Men o' War") : name + 's');
+const lostText = (lost, table) => Object.entries(lost).map(([k, n]) => `${n} ${n > 1 ? plural(table[k].name) : table[k].name}`).join(', ') || 'none';
 function removeDivisionIfEmpty(d) {
   if (armyHousing(d.units) > 0) return false;
   if (d.general) unassignGeneral(d.general, true);
@@ -207,7 +208,7 @@ function landForcesNear(hex, r = 2) {
     out.push({ team: teamOfKingdom(k), kind: 'army', ref: a, group: aiGroup(a, `${k.name} ${a.kind === 'guard' ? 'guard' : a.kind === 'raid' ? 'raiders' : 'army'}`) });
   }
   for (const k of S.kingdoms) {
-    if (WG.dist(k.capital, hex) > r + 2 || k.garrisonBusy) continue;
+    if (k.fallen || WG.dist(k.capital, hex) > r + 2 || k.garrisonBusy) continue;
     out.push({ team: teamOfKingdom(k), kind: 'kgarrison', k, group: { key: 'kg' + k.id, name: `${k.name} garrison`, hex: k.capital, units: armyFromPower(k.power, k.hall, k.personality), stats: (u) => enemyUnitStats(u, k.hall) } });
     const kt = aiCity(k).buildings.filter((b) => DEF_TYPES.includes(b.type) && WG.dist(b.hex, hex) <= 3).map((b) => ({ type: b.type, level: b.level, hex: b.hex }));
     if (kt.length) out.push({ team: teamOfKingdom(k), kind: 'ktowers', k, towers: kt });
@@ -217,7 +218,8 @@ function landForcesNear(hex, r = 2) {
 function navalForcesNear(hex, r = 2) {
   const out = [];
   for (const f of S.fleets) if (f.status !== 'fighting' && WG.dist(f.at, hex) <= r && shipCount(f.ships) > 0) out.push({ team: 'P', kind: 'fleet', ref: f, group: groupOf(f, true) });
-  if (WG.dist(S.world.harbor, hex) <= r + 1 && shipCount(S.harbor) > 0) out.push({ team: 'P', kind: 'harbor', group: { key: 'harbor', name: 'Harbour guard', hex: S.world.harbor, units: { ...S.harbor }, formation: 'line', stance: 'hold', target: 'nearest', stats: (t) => shipStats(t, null, S.boosts) } });
+  // ships lying at anchor defend their own harbour — at home or at any shipyard or port
+  for (const m of berths()) if (WG.dist(m.hex, hex) <= r + 1 && shipCount(m.ships) > 0) out.push({ team: 'P', kind: 'harbor', berth: m, group: { key: 'harbor:' + m.id, name: m.id === 'home' ? 'Harbour guard' : `${m.name} guard`, hex: m.hex, units: { ...m.ships }, formation: 'line', stance: 'hold', target: 'nearest', stats: (t) => shipStats(t, null, S.boosts) } });
   for (const e of S.aiFleets) {
     if (e.status === 'fighting' || WG.dist(e.at, hex) > r || !shipCount(e.ships)) continue;
     const pirate = e.owner === 'pirate';
@@ -284,7 +286,7 @@ function settleForces(forces, r) {
     if (f.kind === 'division') { const l = applyCasualties(f.ref.units, surv('P', f.ref.id), COMBAT_UNITS); for (const [k, v] of Object.entries(l)) lostAll[k] = (lostAll[k] || 0) + v; removeDivisionIfEmpty(f.ref); }
     else if (f.kind === 'fleet') { const l = applyCasualties(f.ref.ships, surv('P', f.ref.id), SHIP_TYPES); for (const [k, v] of Object.entries(l)) lostAll[k] = (lostAll[k] || 0) + v; removeFleetIfEmpty(f.ref); }
     else if (f.kind === 'garrison') { const l = applyCasualties(S.army, surv('P', 'garrison'), COMBAT_UNITS); for (const [k, v] of Object.entries(l)) lostAll[k] = (lostAll[k] || 0) + v; }
-    else if (f.kind === 'harbor') { const l = applyCasualties(S.harbor, surv('P', 'harbor'), SHIP_TYPES); for (const [k, v] of Object.entries(l)) lostAll[k] = (lostAll[k] || 0) + v; }
+    else if (f.kind === 'harbor') { const l = applyCasualties((berthById(f.berth.id) || f.berth).ships, surv('P', 'harbor:' + f.berth.id), SHIP_TYPES); for (const [k, v] of Object.entries(l)) lostAll[k] = (lostAll[k] || 0) + v; }
     else if (f.kind === 'army') {
       const left = surv(f.team, f.ref.id); f.ref.units = { ...emptyArmy(), ...left };
       f.ref.status = f.ref.path.length ? 'moving' : 'idle';
@@ -343,8 +345,7 @@ function arrive(ent) {
     const k = S.kingdoms[owner];
     if (teamOfKingdom(k) === 'P') { toast(`${k.name} is your ally`, 'bad'); return; }
     provoke(k);
-    if (o.hex === k.capital) assaultCapital(d, k);
-    else skirmish(d, k, o.hex);
+    if (!invade(d, k, o.hex)) holdAttack(d, o.hex);
   } else if (o.type === 'attack-army') {
     const a = S.aiArmies.find((x) => x.id === o.target);
     if (a && WG.dist(a.at, d.at) <= 2) { provoke(S.kingdoms[a.kid]); fieldBattle(d.at, 'P', teamOfKingdom(S.kingdoms[a.kid]), `⚔️ ${d.name} attacks the ${S.kingdoms[a.kid].name} army`); }
@@ -372,7 +373,7 @@ function fieldBattle(hex, A, B, title, offline) {
 function assaultCapital(d, k) {
   if (!S.intel[k.id]) gatherIntel(k);
   const T = teamOfKingdom(k);
-  gatherBattle(k.capital, ['P', T], { kind: 'land', title: `⚔️ Assault on ${k.name}`, holder: T,
+  return gatherBattle(k.capital, ['P', T], { kind: 'land', title: `⚔️ Assault on ${k.name}`, holder: T,
     onEnd: (r, lost) => {
       k.relation -= r.win ? 30 : 15;
       S.kingdoms.forEach((o) => { if (o !== k && o.allianceId && o.allianceId === k.allianceId) o.relation -= 10; });
@@ -381,25 +382,115 @@ function assaultCapital(d, k) {
         for (const res of RES) { const v = Math.floor(k.res[res] * 0.3 + (res === 'diamonds' ? 3 : 150) * k.hall); loot[res] = v; k.res[res] = Math.max(0, k.res[res] - v); }
         gain(loot); k.defeats++;
         let tiles = 0;
-        for (let n = 0; n < 8; n++) if (playerTiles() < territoryLimit() && transferBorderTile(k.id, -2) >= 0) tiles++; gatherIntel(k);
+        for (let n = 0; n < 8; n++) if (playerTiles() < territoryLimit() && transferBorderTile(k.id, -2) >= 0) tiles++;
+        if (checkSiege(k)) return;   // the city is cut off and surrenders — the fall is the report
+        gatherIntel(k);
         report(`⚔️ Victory over ${k.name}! Loot ${costText(loot)}${tiles ? `, ${tiles} hex${tiles > 1 ? 'es' : ''} seized` : ''}.`, 'good', lost);
       } else { report(`⚔️ The assault on ${k.name} failed.`, 'bad', lost); }
       if (S.divisions.includes(d) && WG.dist(d.at, k.capital) <= 2) giveOrder(d, 'move', neighborsFree(d.at, k.capital));
     } });
 }
+/* ---------- invasions ----------
+   An invasion that could not start used to vanish without a word: a division that
+   had just fought a guard army on the way in was still catching its breath when it
+   arrived, or another battle was raging nearby, and the order was simply dropped.
+   Now the division holds its ground and attacks the moment it can. */
+function invade(d, k, hex) {
+  if (k.fallen || S.world.owner[hex] !== k.id) return true;
+  if (hex === k.capital) return !!assaultCapital(d, k);
+  return !!skirmish(d, k, hex);
+}
+function holdAttack(d, hex) {
+  if (d.waitAttack === hex) return;
+  d.waitAttack = hex;
+  const why = onCooldown(d) ? `regrouping after its last fight (${Math.ceil(d.cooldown - S.time)}s)` : 'waiting for the battle nearby to end';
+  log(`⏳ ${d.name} is ${why} and will attack ${hexName(hex)} as soon as it can.`, 'info');
+  UI.panelDirty = true;
+}
+function retryAttacks() {
+  for (const d of [...S.divisions]) {
+    const hex = d.waitAttack;
+    if (hex == null) continue;
+    if (d.path.length || !d.order || d.order.type !== 'attack' || d.order.hex !== hex) { d.waitAttack = null; continue; }
+    if (d.status === 'fighting' || onCooldown(d) || battleNear(hex)) continue;
+    const o = S.world.owner[hex], k = o >= 0 ? S.kingdoms[o] : null;
+    if (!k || k.fallen || teamOfKingdom(k) === 'P') { d.waitAttack = null; UI.panelDirty = true; continue; }
+    if (invade(d, k, hex)) { d.waitAttack = null; UI.panelDirty = true; }
+  }
+}
+// Take an enemy hex and its neighbours (never the capital itself), then see whether the capital is cut off.
+function seizeAround(k, hex) {
+  const taken = [hex].concat(WG.neighbors(hex)).filter((j) => S.world.owner[j] === k.id && j !== k.capital);
+  for (const j of taken) { S.world.owner[j] = -2; markChunks(j); }
+  if (taken.length) ownedChanged();
+  checkSiege(k);
+  return taken.length;
+}
+/* ---------- a kingdom falls ----------
+   Hold every hex of open ground around a kingdom's capital and the city is cut
+   off: it surrenders, and its whole realm becomes yours. */
+const liveKingdoms = () => S.kingdoms.filter((k) => !k.fallen);
+function capitalRing(k) { return WG.neighbors(k.capital).filter((n) => isPassable(n)); }
+function checkSiege(k) {
+  if (!k || k.fallen) return false;
+  const ring = capitalRing(k);
+  if (!ring.length || !ring.every((n) => S.world.owner[n] === -2)) return false;
+  kingdomFalls(k);
+  return true;
+}
+function kingdomFalls(k) {
+  k.fallen = true; k.fellAt = S.time;
+  k.atWar = false; k.treaty = 0; k.tradePact = false; k.relation = 0; k.wars = {};
+  const loot = {};
+  for (const res of RES) { const v = Math.floor(Math.max(0, k.res[res] || 0) * 0.6); if (v) loot[res] = v; k.res[res] = 0; }
+  gain(loot, true);
+  let land = 0;
+  const { owner } = S.world;
+  for (let i = 0; i < owner.length; i++) if (owner[i] === k.id) { owner[i] = -2; land++; }
+  owner[k.capital] = -2;
+  for (const j of WG.within(k.capital, 4 + k.hall)) markChunks(j);
+  ownedChanged();
+  // its armies lay down their arms and its ships strike their colours
+  S.aiArmies = S.aiArmies.filter((a) => a.kid !== k.id || a.status === 'fighting');
+  S.aiArmies.forEach((a) => { if (a.kid === k.id) a.kind = 'home'; });
+  S.aiFleets = S.aiFleets.filter((f) => f.owner !== k.id || f.status === 'fighting');
+  if (k.allianceId) {
+    const a = allianceOf(k.allianceId);
+    if (a) {
+      a.members = a.members.filter((m) => m !== k.id);
+      if (a.leader === k.id) a.leader = a.members[0] ?? null;
+      if (!a.members.length) S.alliances = S.alliances.filter((x) => x !== a);
+    }
+    k.allianceId = null;
+  }
+  k.power = 0; k.defense = 0; k.navy = 0;
+  S.stats.kingdomsConquered = (S.stats.kingdomsConquered || 0) + 1;
+  reveal(k.capital, 4);
+  const msg = `👑 ${k.name} has fallen! With its capital surrounded, ${k.ruler} surrendered — ${land + 1} hexes are yours${Object.keys(loot).length ? ` and the treasury yields ${costText(loot)}` : ''}.`;
+  log(msg, 'good'); toast(msg, 'good');
+  shake(6);
+  UI.panelDirty = true;
+}
 function neighborsFree(at, cap) { if (WG.dist(at, cap) > 2) return at; return WG.within(cap, 5).filter((n) => isPassable(n) && WG.dist(n, cap) >= 4).sort((a, b) => WG.dist(a, at) - WG.dist(b, at))[0] ?? at; }
 function skirmish(d, k, hex) {
   const T = teamOfKingdom(k), g = k.power * 0.12 + 30 * k.hall;
   const local = { team: T, kind: 'local', group: { key: 'local', name: `${k.name} militia`, hex, units: armyFromPower(g, k.hall, k.personality), stats: (u) => enemyUnitStats(u, k.hall) } };
-  gatherBattle(hex, ['P', T], { kind: 'land', title: `🏳️ ${d.name} invades ${k.name}'s land`, extra: [local], holder: T,
+  // Nobody to hold the hex but a handful of militia facing a far stronger host: they lay down their arms.
+  const defended = landForcesNear(hex).some((f) => f.team !== 'P' && teamsHostile(f.team, 'P', ['P', T]));
+  if (!defended && armyPower(d.units, d.general) >= 3 * enemyArmyPower(local.group.units, k.hall)) {
+    k.relation -= 10;
+    const n = seizeAround(k, hex);
+    if (!k.fallen) report(`🏳️ ${k.name}'s militia laid down their arms before ${d.name} — ${n} hex${n === 1 ? '' : 'es'} taken without a fight.`, 'good');
+    UI.panelDirty = true;
+    return true;
+  }
+  return gatherBattle(hex, ['P', T], { kind: 'land', title: `🏳️ ${d.name} invades ${k.name}'s land`, extra: [local], holder: T,
     onEnd: (r, lost) => {
       k.relation -= 10; k.power = Math.max(60, k.power - g * 0.5);
       if (r.win) {
-        const taken = [hex].concat(WG.neighbors(hex)).filter((j) => S.world.owner[j] === k.id && j !== k.capital);
-        const room = playerTiles() + taken.length <= territoryLimit();
-        for (const j of taken) S.world.owner[j] = room ? -2 : -1;
-        ownedChanged();
-        report(`🏳️ ${room ? 'Conquered' : 'Razed'} ${taken.length} hexes of ${k.name}.`, 'good', lost);
+        const n = seizeAround(k, hex);
+        if (!k.fallen) report(`🏳️ Conquered ${n} hex${n === 1 ? '' : 'es'} of ${k.name}.`, 'good', lost);
+        else if (lost && Object.keys(lost).length) report('🏳️ The last stand is over.', 'good', lost);
       } else { report(`🏳️ Repelled by ${k.name}.`, 'bad', lost); }
     } });
 }
@@ -466,7 +557,7 @@ function spawnGuard(k) {
 }
 function aiTurn(offline) {
   const pp = totalPower();
-  for (const k of S.kingdoms) {
+  for (const k of liveKingdoms()) {
     for (const r of Object.keys(k.res)) k.res[r] += (r === 'diamonds' ? 1 : 70) * k.hall;
     const w = { ...PERSONALITIES[k.personality].w };
     if (k.power < pp * 0.5) w.train += 3;
@@ -513,8 +604,8 @@ function aiTurn(offline) {
   }
   // Wars between AI kingdoms — armies you can watch (or join!) on the map.
   if (Math.random() < 0.15 && S.aiArmies.filter((a) => a.kind === 'war').length < 4) {
-    const a = pick(S.kingdoms.filter((k) => k.personality === 'aggressive' || k.personality === 'expansionist'));
-    const targets = a ? S.kingdoms.filter((k) => k !== a && teamOfKingdom(k) !== teamOfKingdom(a) && WG.dist(k.capital, a.capital) < 55) : [];
+    const a = pick(liveKingdoms().filter((k) => k.personality === 'aggressive' || k.personality === 'expansionist'));
+    const targets = a ? liveKingdoms().filter((k) => k !== a && teamOfKingdom(k) !== teamOfKingdom(a) && WG.dist(k.capital, a.capital) < 55) : [];
     if (targets.length) {
       const b = pick(targets);
       if (spawnAiArmy(a, b.capital, 'war', a.power * 0.4)) { a.wars[b.id] = b.wars[a.id] = S.time + 900; if (!offline && (isSeen(a.capital) || isSeen(b.capital))) log(`⚔️ ${a.name} declared war on ${b.name}!`, 'info'); }
@@ -565,6 +656,7 @@ function stepAiArmies(dt, offline) {
     // AI-vs-AI war: a real battle at the target capital (you can join if you are nearby!)
     const target = S.kingdoms.find((x) => x.capital === a.target);
     if (!target) { S.aiArmies = S.aiArmies.filter((x) => x !== a); continue; }
+    if (target.fallen) { a.kind = 'home'; a.path = findPath(WG, a.at, k.capital, aiLandCost) || []; continue; }   // nothing left to besiege
     const TA = teamOfKingdom(k), TB = teamOfKingdom(target);
     const bt = gatherBattle(target.capital, [TA, TB], { kind: 'land', title: `⚔️ ${k.name} besieges ${target.name}`, holder: TB, offline,
       onEnd: (r) => {
@@ -603,7 +695,7 @@ function stepAiFleets(dt) {
   }
 }
 function piratesAtHarbor(p) {
-  if (shipCount(S.harbor) > 0 && S.started) {
+  if (S.started && berths().some((m) => WG.dist(m.hex, S.world.harbor) <= 3 && shipCount(m.ships) > 0)) {
     gatherBattle(S.world.harbor, ['P', 'X'], { kind: 'naval', title: '🏴‍☠️ Pirates attack your harbour!', holder: 'P',
       onEnd: (r, lost) => {
         if (r.win) { gain({ gold: 300 }); report('🏴‍☠️ Your harbour guard sank the pirates! +💰300 bounty.', 'good', lost); }
@@ -634,7 +726,7 @@ function mainlandSet() {
 }
 function canReachCapital(k) { return !!mainlandSet()[k.capital]; }
 function raidCandidates() {
-  return S.kingdoms.filter((k) => !friendlyToPlayer(k) && (k.atWar || k.relation < 0 || k.personality === 'aggressive'));
+  return liveKingdoms().filter((k) => !friendlyToPlayer(k) && (k.atWar || k.relation < 0 || k.personality === 'aggressive'));
 }
 // Raids came every five to eight minutes, which left no time to play anything
 // else. Now it is closer to once an hour (sooner with a big Main Hall or a war).
@@ -720,7 +812,7 @@ function resolveRaid(a, offline) {
     else {
       const adj = WG.neighbors(hex).some((n) => S.world.owner[n] === k.id);
       const b = buildingAt(hex);
-      if (b && b.type !== 'hall') { S.buildings = S.buildings.filter((x) => x !== b); }
+      if (b && b.type !== 'hall') { strandShips(b); S.buildings = S.buildings.filter((x) => x !== b); }
       S.world.owner[hex] = adj ? k.id : -1; ownedChanged();
       lostHex = (b && b.type !== 'hall' ? ` and destroyed your ${BUILDINGS[b.type].name}` : '') + (adj ? `, annexing ${hexName(hex)}` : ` at ${hexName(hex)}`);
     }
@@ -957,6 +1049,7 @@ function step(dt, offline = false) {
   stepAiArmies(dt, offline);
   stepAiFleets(dt);
   checkEncounters(offline);
+  retryAttacks();
   S.guardTimer = (S.guardTimer || 0) - dt;
   if (S.guardTimer <= 0) { S.guardTimer = GUARD_TICK; if (!catchingUp()) guardDuty(offline); }
 

@@ -16,9 +16,43 @@ const queueLimit = (b) => 20 + 10 * b.level;   // no army cap — only the queue
 const trainerOf = (u) => S.buildings.filter((b) => b.type === UNITS[u].from && b.level > 0).sort((a, b) => b.level - a.level)[0];
 const shipyardLevel = () => Math.max(0, ...S.buildings.filter((b) => b.type === 'shipyard').map((b) => b.level));
 function allShips() {
-  const s = { ...S.harbor };
+  const s = emptyFleet();
+  for (const m of berths()) for (const t of SHIP_TYPES) s[t] += m.ships[t] || 0;
   for (const f of S.fleets) for (const t of SHIP_TYPES) s[t] += f.ships[t] || 0;
   return s;
+}
+/* ---- Berths: where ships lie at anchor ----
+   A ship is launched beside the shipyard that built it, and a fleet formed from
+   it sets sail from there — not from the capital. Every shipyard and port with
+   water beside it is a berth; the home harbour by the capital is another. */
+function berthHex(b) {
+  const water = WG.neighbors(b.hex).filter(isWater);
+  return water.length ? water.sort((x, y) => WG.neighbors(y).filter(isWater).length - WG.neighbors(x).filter(isWater).length || x - y)[0] : -1;
+}
+function berths() {
+  const out = [{ id: 'home', name: 'Home harbour', icon: '🏰', hex: S.world.harbor, ships: S.harbor }];
+  for (const b of S.buildings) {
+    if ((b.type !== 'shipyard' && b.type !== 'port') || (b.level < 1 && !b.ships)) continue;
+    const hex = berthHex(b);
+    if (hex < 0) continue;
+    if (!b.ships) b.ships = emptyFleet(); else for (const t of SHIP_TYPES) b.ships[t] = b.ships[t] || 0;   // same object every time: battles hold on to it
+    out.push({ id: String(b.id), name: `${BUILDINGS[b.type].name} at ${hexName(b.hex)}`, icon: BUILDINGS[b.type].icon, hex, ships: b.ships, b });
+  }
+  return out;
+}
+const berthById = (id) => berths().find((m) => m.id === String(id));
+const shipsAtBerths = () => berths().reduce((s, m) => s + shipCount(m.ships), 0);
+// The berth a fleet lying at `hex` can moor at, if any.
+function berthAt(hex) {
+  const all = berths();
+  return all.find((m) => m.hex === hex) || all.find((m) => m.b && WG.dist(m.b.hex, hex) <= 1) || null;
+}
+// A shipyard or port that is demolished or burnt sends its ships to the home harbour.
+function strandShips(b) {
+  if (!b || !b.ships || !shipCount(b.ships)) return;
+  for (const t of SHIP_TYPES) S.harbor[t] += b.ships[t] || 0;
+  log(`⚓ The ships at the ${BUILDINGS[b.type].name} at ${hexName(b.hex)} sailed for the home harbour.`, 'info');
+  b.ships = emptyFleet();
 }
 const shipCount = (ships) => SHIP_TYPES.reduce((s, t) => s + (ships[t] || 0), 0);
 const queuedShips = () => S.buildings.reduce((s, b) => s + (b.type === 'shipyard' ? b.queue.length : 0), 0);
@@ -143,7 +177,7 @@ const armyPower = (units, gid) => COMBAT_UNITS.reduce((s, u) => s + (units[u] ? 
 const fleetPower = (ships, gid) => SHIP_TYPES.reduce((s, t) => s + (ships[t] ? unitPower(shipStats(t, gid)) * ships[t] : 0), 0);
 function totalPower() {
   return armyPower(S.army, S.castellan) + S.divisions.reduce((s, d) => s + armyPower(d.units, d.general), 0)
-    + fleetPower(S.harbor, null) + S.fleets.reduce((s, f) => s + fleetPower(f.ships, f.general), 0) + defenseRating();
+    + berths().reduce((s, m) => s + fleetPower(m.ships, null), 0) + S.fleets.reduce((s, f) => s + fleetPower(f.ships, f.general), 0) + defenseRating();
 }
 function divisionSpeed(d) {
   const types = COMBAT_UNITS.filter((u) => d.units[u] > 0).concat(d.units.scout > 0 ? ['scout'] : []);
@@ -195,10 +229,16 @@ function shipError(t) {
   if (S.army.seaman < SHIPS[t].crew) return `Needs a crew of ${SHIPS[t].crew} Seamen (you have ${S.army.seaman}) — train them at the Port`;
   return null;
 }
-function buildShips(t, n) {
+// `yardId` picks the shipyard; without one the least busy yard that can build it does.
+function buildShips(t, n, yardId) {
   const err = shipError(t);
   if (err) { toast(err, 'bad'); return 0; }
-  const yards = S.buildings.filter((b) => b.type === 'shipyard' && b.level >= SHIPS[t].lvl).sort((a, b) => a.queue.length - b.queue.length);
+  let yards = S.buildings.filter((b) => b.type === 'shipyard' && b.level >= SHIPS[t].lvl);
+  if (yardId != null && yardId !== '') {
+    const y = yards.filter((b) => b.id === +yardId);
+    if (!y.length) { toast(`That shipyard cannot build a ${SHIPS[t].name} — it needs level ${SHIPS[t].lvl}`, 'bad'); return 0; }
+    yards = y;
+  }
   let made = 0;
   for (let i = 0; i < n; i++) {
     const b = yards.sort((a, c) => a.queue.length - c.queue.length)[0];
@@ -219,7 +259,11 @@ function stepQueue(b, dt) {
   b.trainLeft -= dt * (ship ? 1 : 1 + allianceBonus().train);
   while (b.trainLeft <= 0 && b.queue.length) {
     const x = b.queue.shift();
-    if (ship) { S.harbor[x]++; log(`${SHIPS[x].name} launched from the shipyard.`, 'good'); }
+    if (ship) {
+      const m = berthById(b.id);
+      (m ? m.ships : S.harbor)[x]++;
+      log(`${SHIPS[x].name} launched from the shipyard at ${hexName(b.hex)}.`, 'good');
+    }
     else S.army[x]++;
     UI.panelDirty = true;
     if (b.queue.length) b.trainLeft += ship ? shipTime(b.queue[0]) : trainTime(b.queue[0]); else b.trainLeft = 0;
@@ -304,14 +348,17 @@ function mergeDivisions(into, from) {
   return true;
 }
 
-function createFleet(name, ships, gid) {
+// The fleet puts to sea from the berth its ships lie at (default: the one with the most ships).
+function createFleet(name, ships, gid, berthId) {
   if (S.fleets.length >= fleetLimit()) { toast(`Fleet limit (${fleetLimit()}) — build more shipyards`, 'bad'); return null; }
+  const m = berthId != null ? berthById(berthId) : berths().sort((a, b) => shipCount(b.ships) - shipCount(a.ships))[0];
+  if (!m) { toast('That harbour is gone', 'bad'); return null; }
   const take = {};
-  for (const t of SHIP_TYPES) take[t] = Math.min(ships[t] || 0, S.harbor[t] || 0);
-  if (shipCount(take) <= 0) { toast('A fleet needs at least one ship', 'bad'); return null; }
-  for (const t of SHIP_TYPES) S.harbor[t] -= take[t];
+  for (const t of SHIP_TYPES) take[t] = clamp(Math.floor(ships[t] || 0), 0, m.ships[t] || 0);
+  if (shipCount(take) <= 0) { toast(`A fleet needs at least one ship — none are moored at the ${m.name}`, 'bad'); return null; }
+  for (const t of SHIP_TYPES) m.ships[t] -= take[t];
   const f = { id: 'f' + uid(), name: (name || '').trim().slice(0, 24) || `Fleet ${S.fleets.length + 1}`, ships: { ...emptyFleet(), ...take },
-    general: null, at: S.world.harbor, path: [], prog: 0, order: null, status: 'idle', formation: 'line', stance: 'advance', target: 'nearest' };
+    general: null, at: m.hex, path: [], prog: 0, order: null, status: 'idle', formation: 'line', stance: 'advance', target: 'nearest' };
   S.fleets.push(f);
   if (gid) assignGeneral(gid, 'fleet', f.id);
   log(`${f.name} set sail with ${shipCount(take)} ships.`, 'good');
@@ -319,10 +366,13 @@ function createFleet(name, ships, gid) {
   return f;
 }
 const fleetHome = (f) => !f.path.length && (f.at === S.world.harbor || dockAt(f.at) >= 0);
+// Ships of a disbanded fleet moor where it lies: the home harbour, or the shipyard or port beside it.
 function disbandFleet(f) {
   if (!f) return;
-  if (!fleetHome(f)) { toast('Fleets can only disband in the home harbor', 'bad'); return; }
-  for (const t of SHIP_TYPES) S.harbor[t] += f.ships[t];
+  if (!fleetHome(f)) { toast('Fleets can only disband in a harbour — home, or beside one of your shipyards or ports', 'bad'); return; }
+  const m = berthAt(f.at) || berths()[0];
+  for (const t of SHIP_TYPES) m.ships[t] += f.ships[t];
+  log(`${f.name} moored at the ${m.name}.`, 'info');
   S.fleets = S.fleets.filter((x) => x !== f);
   if (UI.selEntity && UI.selEntity.id === f.id) UI.selEntity = null;
   UI.panelDirty = true;

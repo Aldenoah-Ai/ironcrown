@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#101923">
+<title>Crown & Council — Prototype</title>
+<style>
+:root{--ink:#101923;--panel:#192631;--panel2:#22333d;--paper:#eee4cc;--muted:#a9b2ae;--gold:#c9a96a;--green:#78917a;--line:#3b4a4e;--red:#b66e63}
+*{box-sizing:border-box}body{margin:0;background:#0b1219;color:var(--paper);font:14px/1.4 system-ui,-apple-system,sans-serif;min-height:100vh}button{font:inherit;color:inherit;cursor:pointer}button:focus-visible{outline:2px solid var(--gold);outline-offset:3px}.shell{max-width:480px;min-height:100dvh;margin:auto;background:var(--ink);display:flex;flex-direction:column;border-inline:1px solid #28343b}.top{padding:env(safe-area-inset-top,12px) 18px 12px;background:#111d26;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}.brand{font:small-caps 700 16px Georgia,serif;letter-spacing:2px;color:var(--gold)}.day{font-size:11px;color:var(--muted);text-align:right}.content{padding:16px;display:grid;gap:13px}.eyebrow{text-transform:uppercase;letter-spacing:2px;color:var(--gold);font-size:10px;font-weight:700}.heading{font:clamp(25px,7vw,32px)/1.05 Georgia,serif;margin:4px 0 6px}.sub{color:var(--muted);font-size:12px}.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:7px}.stat{background:var(--panel);border:1px solid var(--line);padding:10px 8px;border-radius:8px;min-width:0}.stat span{display:block;color:var(--muted);font-size:10px;white-space:nowrap}.stat strong{display:block;font:700 18px Georgia,serif;margin-top:3px;color:var(--paper)}.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden}.cardhead{display:flex;justify-content:space-between;align-items:center;padding:12px 13px;border-bottom:1px solid var(--line)}.cardhead h2{font:600 16px Georgia,serif;margin:0}.cardbody{padding:12px}.mapwrap{background:#182a2b;padding:0;position:relative}.mapwrap canvas{display:block;width:100%;height:280px;touch-action:pan-y}.maplabel{position:absolute;left:12px;top:10px;background:#101923d9;border:1px solid #51645c;padding:6px 9px;border-radius:6px;font-size:10px;letter-spacing:1px}.legend{display:flex;gap:10px;flex-wrap:wrap;color:var(--muted);font-size:10px;padding:10px 12px;border-top:1px solid var(--line)}.dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:4px}.actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}.btn{border:1px solid #58645d;background:#273841;border-radius:7px;padding:11px 10px;text-align:left}.btn.primary{background:var(--gold);border-color:var(--gold);color:#17212a;font-weight:700}.btn small{display:block;color:inherit;opacity:.72;font-size:10px;margin-top:3px}.event{display:flex;gap:10px;padding:10px 0;border-bottom:1px solid #334148}.event:last-child{border:0;padding-bottom:0}.eventicon{width:30px;height:30px;display:grid;place-items:center;background:#2a3a3e;border-radius:7px;flex:none}.event strong{font-size:12px}.event p{margin:3px 0 0;color:var(--muted);font-size:11px}.nav{margin-top:auto;position:sticky;bottom:0;background:#111d26;border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(4,1fr);padding:7px 6px calc(7px + env(safe-area-inset-bottom,0px));gap:3px}.nav button{background:transparent;border:0;border-radius:7px;padding:8px 2px;color:var(--muted);font-size:10px}.nav button.active{background:#293943;color:var(--gold)}.nav b{display:block;font-size:18px;font-weight:500;margin-bottom:2px}.bar{height:5px;background:#3a494b;border-radius:99px;overflow:hidden;margin-top:7px}.bar i{display:block;height:100%;background:var(--green);width:68%}.rowitem{display:flex;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid var(--line)}.rowitem:last-child{border:0}.portrait{width:42px;height:42px;border-radius:50%;display:grid;place-items:center;background:linear-gradient(145deg,#8e9a82,#354c4a);font:20px Georgia,serif;color:#14212a;flex:none}.rowtext{flex:1;min-width:0}.rowtext strong{font:15px Georgia,serif}.rowtext small{display:block;color:var(--muted);font-size:11px;margin-top:3px}.tag{font-size:10px;color:var(--gold);border:1px solid #66583e;border-radius:5px;padding:4px 6px}.screen{display:none}.screen.active{display:grid;gap:13px}.menu{min-height:100dvh;display:flex;flex-direction:column;justify-content:center;padding:26px 22px;background:radial-gradient(ellipse at 50% 28%,#33433d 0,#17252b 42%,#0b1219 78%);text-align:center}.sigil{width:92px;height:92px;margin:0 auto 22px;border:1px solid var(--gold);transform:rotate(45deg);display:grid;place-items:center;box-shadow:0 0 0 7px #c9a96a10}.sigil span{transform:rotate(-45deg);font-size:42px;color:var(--gold)}.menu h1{font:clamp(38px,10vw,52px)/.98 Georgia,serif;font-weight:500;margin:0;color:var(--paper)}.menu h1 em{font-weight:400;color:var(--gold)}.menu .sub{max-width:250px;margin:14px auto 30px;line-height:1.7}.menu .btn{width:100%;text-align:center;margin:5px 0;padding:14px}.menu .btn small{font-size:11px}.footnote{font-size:10px;color:#788581;margin-top:24px}.notice{padding:10px 12px;background:#2b3939;border:1px solid #526455;border-radius:8px;color:#d8dfd0;font-size:12px}.sectiontitle{font:20px Georgia,serif;margin:0}.back{background:transparent;border:1px solid var(--line);border-radius:6px;padding:7px 10px;color:var(--muted)}@media(min-width:600px){body{padding:20px 0}.shell{min-height:calc(100dvh - 40px);border:1px solid var(--line);border-radius:14px;overflow:hidden}.menu{min-height:calc(100dvh - 42px)}}
+</style>
+</head>
+<body>
+<div class="shell">
+<section id="menu" class="menu">
+<div class="sigil"><span>♜</span></div>
+<div class="eyebrow">A realm is not inherited. It is built.</div>
+<h1>Crown <em>&</em><br>Council</h1>
+<p class="sub">Rule wisely. Keep your promises. Decide what your kingdom will become.</p>
+<button class="btn primary" id="continueBtn">Continue the Realm<small>Return to your council chamber</small></button>
+<button class="btn" id="newBtn">Found a New Kingdom<small>Begin your reign</small></button>
+<button class="btn" id="loadBtn">Load Saved Realm</button>
+<div class="footnote">EARLY PLAYABLE CONCEPT · LOCAL SAVE</div>
+</section>
+<div id="game" style="display:none;flex:1;flex-direction:column">
+<header class="top"><div class="brand">♜ Crown & Council</div><div class="day"><span id="season">EARLY AUTUMN</span><br><strong id="day">Day 1 · Year 1</strong></div></header>
+<main class="content">
+<section id="realm" class="screen active">
+<div><div class="eyebrow">Your realm · The northern marches</div><h1 class="heading" id="realmName">The Alder Crown</h1><div class="sub">A small kingdom with a future yet unwritten.</div></div>
+<div class="stats">
+<div class="stat"><span>✦ Treasury</span><strong id="gold">850</strong></div>
+<div class="stat"><span>♧ Food</span><strong id="food">420</strong></div>
+<div class="stat"><span>♢ Stability</span><strong id="stability">68%</strong></div>
+<div class="stat"><span>♜ Prestige</span><strong id="prestige">12</strong></div>
+</div>
+<div class="card">
+<div class="cardhead"><h2>Realm Map</h2><span class="tag">NORTHLANDS</span></div>
+<div class="mapwrap"><canvas id="map" aria-label="Interactive illustrated map of your kingdom"></canvas><div class="maplabel">✦ ALDERMERE PROVINCE</div></div>
+<div class="legend"><span><i class="dot" style="background:#d2b26e"></i>Your holdings</span><span><i class="dot" style="background:#9b8064"></i>Settlements</span><span><i class="dot" style="background:#78917a"></i>Wild land</span></div>
+</div>
+<div class="card"><div class="cardhead"><h2>Royal Decisions</h2><span class="eyebrow">Choose one</span></div><div class="cardbody actions">
+<button class="btn" data-action="tax">Adjust Taxes<small>+gold, risk stability</small></button>
+<button class="btn" data-action="festival">Hold a Festival<small>Spend gold, lift spirits</small></button>
+<button class="btn" data-action="granary">Open the Granary<small>Feed the people</small></button>
+<button class="btn" data-action="council">Call the Council<small>Build political support</small></button>
+</div></div>
+<div class="card"><div class="cardhead"><h2>At Court</h2><span class="tag">3 PRESENT</span></div><div class="cardbody">
+<div class="event"><div class="eventicon">♙</div><div><strong>Steward Elric</strong><p>“The treasury is modest, but sound decisions will carry us through.”</p></div></div>
+<div class="event"><div class="eventicon">⚖</div><div><strong>Lady Maelin</strong><p>She asks for a voice in the next council session.</p></div></div>
+</div></div>
+</section>
+<section id="council" class="screen">
+<div><div class="eyebrow">Laws · Factions · Diplomacy</div><h1 class="heading">The Council</h1><p class="sub">Power is held by more than the crown alone.</p></div>
+<div class="card"><div class="cardhead"><h2>Realm Policies</h2></div><div class="cardbody">
+<div class="rowitem"><div class="rowtext"><strong>Taxation</strong><small id="taxDesc">Balanced levies — steady income and support.</small><div class="bar"><i id="taxBar"></i></div></div><button class="back" id="taxCycle">Change</button></div>
+<div class="rowitem"><div class="rowtext"><strong>Food Reserves</strong><small>Granary stores protect the realm during poor harvests.</small></div><span class="tag">Adequate</span></div>
+<div class="rowitem"><div class="rowtext"><strong>Royal Decrees</strong><small>Each decree can shift public trust and court influence.</small></div><span class="tag">Open</span></div>
+</div></div>
+<div class="card"><div class="cardhead"><h2>Petitions</h2></div><div class="cardbody">
+<div class="event"><div class="eventicon">♧</div><div><strong>The Village Elders</strong><p>Request lower levies before the winter stores are counted.</p><button class="back" data-petition="elders">Hear their petition</button></div></div>
+<div class="event"><div class="eventicon">♜</div><div><strong>The Border Wardens</strong><p>Ask for funding to repair the northern watchposts.</p><button class="back" data-petition="wardens">Review the request</button></div></div>
+</div></div>
+</section>
+<section id="court" class="screen">
+<div><div class="eyebrow">Loyalty · Trust · Alliances</div><h1 class="heading">The Royal Court</h1><p class="sub">Relationships grow through decisions, not just gifts.</p></div>
+<div class="card"><div class="cardhead"><h2>Your Inner Circle</h2></div><div class="cardbody">
+<div class="rowitem"><div class="portrait">E</div><div class="rowtext"><strong>Steward Elric</strong><small>Practical · Values stability</small><div class="bar"><i id="elricBar" style="width:72%"></i></div></div><span class="tag" id="elricTrust">72 Trust</span></div>
+<div class="rowitem"><div class="portrait">M</div><div class="rowtext"><strong>Lady Maelin</strong><small>Diplomatic · Wants influence</small><div class="bar"><i id="maelinBar" style="width:58%"></i></div></div><span class="tag" id="maelinTrust">58 Trust</span></div>
+<div class="rowitem"><div class="portrait">R</div><div class="rowtext"><strong>Captain Rowan</strong><small>Steadfast · Guards the border</small><div class="bar"><i id="rowanBar" style="width:64%"></i></div></div><span class="tag" id="rowanTrust">64 Trust</span></div>
+</div></div>
+<div class="notice">Court choices will affect future events and which advisers support your policies.</div>
+<div class="actions"><button class="btn" data-action="elric">Consult Elric<small>Planning and treasury</small></button><button class="btn" data-action="maelin">Invite Maelin<small>Diplomacy and influence</small></button><button class="btn" data-action="rowan">Meet Rowan<small>Border and security</small></button><button class="btn" data-action="gift">Offer a Court Gift<small>Spend 60 gold</small></button></div>
+</section>
+<section id="military" class="screen">
+<div><div class="eyebrow">Readiness · Supply · Command</div><h1 class="heading">The Muster</h1><p class="sub">A steady realm keeps its people supplied and its borders watched.</p></div>
+<div class="stats"><div class="stat"><span>Readiness</span><strong id="ready">54%</strong></div><div class="stat"><span>Upkeep</span><strong>18</strong></div><div class="stat"><span>Posts</span><strong>3</strong></div><div class="stat"><span>Morale</span><strong id="morale">66%</strong></div></div>
+<div class="card"><div class="cardhead"><h2>Border Companies</h2></div><div class="cardbody">
+<div class="rowitem"><div class="portrait">I</div><div class="rowtext"><strong>First Watch</strong><small>North road · Supplies stable</small><div class="bar"><i id="watchBar" style="width:54%"></i></div></div><span class="tag">On Duty</span></div>
+<div class="rowitem"><div class="portrait">II</div><div class="rowtext"><strong>River Guard</strong><small>Eastern crossing · Needs provisions</small><div class="bar"><i style="width:42%;background:var(--gold)"></i></div></div><span class="tag">Watch</span></div>
+<div class="rowitem"><div class="portrait">III</div><div class="rowtext"><strong>Town Reserve</strong><small>Near Aldermere · Ready to respond</small><div class="bar"><i style="width:75%"></i></div></div><span class="tag">Reserve</span></div>
+</div></div>
+<div class="actions"><button class="btn" data-action="drill">Readiness Drill<small>Cost 35 gold</small></button><button class="btn" data-action="supplies">Improve Supplies<small>Cost 25 gold, food</small></button></div>
+</section>
+</main>
+<nav class="nav" aria-label="Main navigation"><button class="active" data-screen="realm"><b>⌂</b>Realm</button><button data-screen="council"><b>⚖</b>Council</button><button data-screen="court"><b>♙</b>Court</button><button data-screen="military"><b>♜</b>Muster</button></nav>
+</div>
+</div>
+<script>
+const initial={day:1,gold:850,food:420,stability:68,prestige:12,tax:1,elric:72,maelin:58,rowan:64,ready:54,morale:66,log:["Your reign begins. The council awaits your first decision."]};
+let s={...initial};
+const $=id=>document.getElementById(id);
+function save(){try{localStorage.setItem("crownCouncilSave",JSON.stringify(s))}catch(e){}}
+function load(){try{const v=JSON.parse(localStorage.getItem("crownCouncilSave"));if(v&&typeof v.gold==="number")s={...initial,...v}}catch(e){}}
+function note(msg){s.log.unshift(msg);s.log=s.log.slice(0,8);const box=document.querySelector("#realm .card:last-child .cardbody");if(box){box.innerHTML="";s.log.slice(0,3).forEach((t,i)=>{const d=document.createElement("div");d.className="event";d.innerHTML='<div class="eventicon">✦</div><div><strong>'+(i===0?"Latest News":"Court Record")+'</strong><p></p></div>';d.querySelector("p").textContent=t;box.appendChild(d)})}}
+function render(){ $("gold").textContent=s.gold;$("food").textContent=s.food;$("stability").textContent=s.stability+"%";$("prestige").textContent=s.prestige;$("day").textContent="Day "+s.day+" · Year 1";$("taxDesc").textContent=["Light levies — modest income, stronger support.","Balanced levies — steady income and support.","Heavy levies — strong income, risks public trust."][s.tax];$("taxBar").style.width=[35,60,88][s.tax]+"%";["elric","maelin","rowan"].forEach(k=>{$(k+"Bar").style.width=s[k]+"%";$(k+"Trust").textContent=s[k]+" Trust"});$("ready").textContent=s.ready+"%";$("morale").textContent=s.morale+"%";$("watchBar").style.width=s.ready+"%";save()}
+function start(fresh){if(fresh)s={...initial};else load();$("menu").style.display="none";$("game").style.display="flex";render();drawMap();showScreen("realm")}
+$("newBtn").onclick=()=>start(true);$("continueBtn").onclick=()=>start(false);$("loadBtn").onclick=()=>{load();if(!localStorage.getItem("crownCouncilSave")){alert("No saved realm yet. Start a new kingdom first.");return}start(false)};
+function showScreen(name){document.querySelectorAll(".screen").forEach(x=>x.classList.toggle("active",x.id===name));document.querySelectorAll(".nav button").forEach(x=>x.classList.toggle("active",x.dataset.screen===name));if(name==="realm")requestAnimationFrame(drawMap)}
+document.querySelectorAll(".nav button").forEach(b=>b.onclick=()=>showScreen(b.dataset.screen));
+function advance(){s.day++;if(s.day%3===0){s.food=Math.max(0,s.food-8);s.gold+=18}if(s.day%7===0){s.food+=24;note("A small harvest reaches the granaries.")}render()}
+function act(a){let msg="";switch(a){
+case"tax":s.tax=(s.tax+1)%3;if(s.tax===0){s.gold+=15;s.stability=Math.min(100,s.stability+3);msg="Light levies eased pressure on the villages."}else if(s.tax===1){s.gold+=35;msg="Balanced levies brought steady revenue."}else{s.gold+=65;s.stability=Math.max(0,s.stability-7);s.maelin=Math.max(0,s.maelin-3);msg="Heavy levies filled the treasury, but the villages are uneasy."}break;
+case"festival":if(s.gold<50){msg="The treasury cannot cover a festival yet.";break}s.gold-=50;s.stability=Math.min(100,s.stability+8);s.prestige+=2;s.maelin=Math.min(100,s.maelin+3);msg="Music filled the square; public spirits lifted.";break;
+case"granary":if(s.food<30){msg="The granary stores are too low for a distribution.";break}s.food-=30;s.stability=Math.min(100,s.stability+6);s.elric=Math.min(100,s.elric+2);msg="Food was distributed to households in need.";break;
+case"council":s.maelin=Math.min(100,s.maelin+5);s.elric=Math.min(100,s.elric+3);s.stability=Math.min(100,s.stability+2);msg="The council heard each adviser; trust grew.";break;
+case"elric":s.elric=Math.min(100,s.elric+5);s.gold+=10;msg="Elric found a modest saving in the royal accounts.";break;
+case"maelin":s.maelin=Math.min(100,s.maelin+6);s.prestige++;msg="Maelin shared a useful diplomatic proposal.";break;
+case"rowan":s.rowan=Math.min(100,s.rowan+5);s.ready=Math.min(100,s.ready+3);msg="Rowan reviewed the watch rota and improved readiness.";break;
+case"gift":if(s.gold<60){msg="You need 60 gold for a court gift.";break}s.gold-=60;s.maelin=Math.min(100,s.maelin+8);s.elric=Math.min(100,s.elric+2);msg="A thoughtful gift strengthened court goodwill.";break;
+case"drill":if(s.gold<35){msg="Not enough gold for a readiness drill.";break}s.gold-=35;s.ready=Math.min(100,s.ready+10);s.morale=Math.min(100,s.morale+3);msg="The border companies completed a disciplined readiness drill.";break;
+case"supplies":if(s.gold<25||s.food<15){msg="You need 25 gold and 15 food to improve supplies.";break}s.gold-=25;s.food-=15;s.ready=Math.min(100,s.ready+5);s.morale=Math.min(100,s.morale+5);msg="Supply ledgers were corrected and the companies are better prepared.";break;
+}note(msg);advance();render();drawMap();alert(msg)}
+document.querySelectorAll("[data-action]").forEach(b=>b.onclick=()=>act(b.dataset.action));
+$("taxCycle").onclick=()=>act("tax");
+document.querySelectorAll("[data-petition]").forEach(b=>b.onclick=()=>{if(b.dataset.petition==="elders"){s.stability=Math.min(100,s.stability+5);s.gold=Math.max(0,s.gold-20);note("You granted the village elders a small tax relief.");}else{s.gold=Math.max(0,s.gold-40);s.ready=Math.min(100,s.ready+8);s.rowan=Math.min(100,s.rowan+4);note("You funded repairs to the northern watchposts.");}advance();render();alert(s.log[0])});
+const canvas=$("map"),ctx=canvas.getContext("2d");
+function drawMap(){if(!ctx)return;const w=canvas.clientWidth||350,h=280,dpr=Math.min(window.devicePixelRatio||1,2);canvas.width=w*dpr;canvas.height=h*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h);ctx.fillStyle="#203837";ctx.fillRect(0,0,w,h);
+// winding river
+ctx.beginPath();ctx.moveTo(w*.78,-10);ctx.bezierCurveTo(w*.56,50,w*.94,90,w*.62,145);ctx.bezierCurveTo(w*.38,188,w*.57,220,w*.28,295);ctx.strokeStyle="#5b8583";ctx.lineWidth=18;ctx.stroke();ctx.strokeStyle="#8db0a6";ctx.lineWidth=2;ctx.stroke();
+// subtle land hexes
+const size=19,dx=size*1.72,dy=size*1.5;
+for(let row=-1;row<Math.ceil(h/dy)+1;row++)for(let col=-1;col<Math.ceil(w/dx)+1;col++){const x=col*dx+(row%2)*dx/2+12,y=row*dy+15;const seed=(row*17+col*29+row*col*7);ctx.beginPath();for(let i=0;i<6;i++){const a=Math.PI/3*i-Math.PI/6;const px=x+size*Math.cos(a),py=y+size*Math.sin(a);if(i===0)ctx.moveTo(px,py);else ctx.lineTo(px,py)}ctx.closePath();ctx.fillStyle=((seed%7+7)%7===0)?"#334c3e":(((seed%5+5)%5===0)?"#3a4d3d":"#30473b");ctx.fill();ctx.strokeStyle="#52634a";ctx.lineWidth=.65;ctx.stroke();if((seed%13+13)%13===0){ctx.fillStyle="#78917a";ctx.font="12px Georgia";ctx.fillText("♠",x-5,y+4)}}
+// borders
+ctx.beginPath();ctx.moveTo(w*.08,h*.32);ctx.lineTo(w*.36,h*.18);ctx.lineTo(w*.53,h*.38);ctx.lineTo(w*.48,h*.76);ctx.lineTo(w*.18,h*.82);ctx.closePath();ctx.strokeStyle="#c9a96a";ctx.lineWidth=2;ctx.setLineDash([5,4]);ctx.stroke();ctx.setLineDash([]);
+// road
+ctx.beginPath();ctx.moveTo(w*.26,h*.57);ctx.quadraticCurveTo(w*.43,h*.47,w*.58,h*.59);ctx.quadraticCurveTo(w*.7,h*.66,w*.79,h*.47);ctx.strokeStyle="#b7a17b";ctx.lineWidth=3;ctx.stroke();
+// settlement marker helper
+function place(x,y,icon,label,color){ctx.fillStyle="#111c22";ctx.beginPath();ctx.arc(x,y,13,0,Math.PI*2);ctx.fill();ctx.strokeStyle=color;ctx.lineWidth=1.5;ctx.stroke();ctx.fillStyle=color;ctx.font="15px Georgia";ctx.textAlign="center";ctx.fillText(icon,x,y+5);ctx.fillStyle="#f0e5ca";ctx.font="10px system-ui";ctx.fillText(label,x,y+25)}
+place(w*.32,h*.53,"♜","ALDERMERE","#d8b56c");place(w*.57,h*.36,"⌂","MILLFORD","#c3a98a");place(w*.19,h*.72,"⌂","WESTHAVEN","#c3a98a");place(w*.77,h*.48,"♙","NORTH WATCH","#d8b56c");
+// mountains
+ctx.fillStyle="#8c9584";[[.17,.2],[.22,.17],[.28,.23],[.7,.2],[.75,.17]].forEach(([x,y])=>{const px=w*x,py=h*y;ctx.beginPath();ctx.moveTo(px-9,py+8);ctx.lineTo(px,py-8);ctx.lineTo(px+10,py+8);ctx.closePath();ctx.fill()});
+ctx.textAlign="start";
+}
+window.addEventListener("resize",()=>{if($("game").style.display!=="none")drawMap()});
+</script>
+</body>
+</html>
